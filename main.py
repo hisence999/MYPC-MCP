@@ -1,74 +1,105 @@
+"""
+MYPC-MCP - Windows PC Control Server
+
+基于 Model Context Protocol (MCP) 的 Windows 电脑控制服务器
+为 AI 智能体提供全面的本地 Windows PC 控制能力
+"""
+
 import os
-import json
 import socket
 from mcp.server.fastmcp import FastMCP
+
+# 导入配置工具
+from utils.config import (
+    load_config,
+    get_config_value,
+    get_safe_zones,
+    get_drives,
+)
+
+# 导入工具模块
 from tools.screen import register_screen_tools
 from tools.system import register_system_tools
 from tools.files import register_file_tools
 from tools.ssh import register_ssh_tools
 from tools.window import register_window_tools
 from tools.search import register_search_tools
-from starlette.applications import Starlette
-from starlette.routing import Route, Mount
+
+# 新增工具（从原始项目迁移）
+from tools.bash import register_bash_tools
+from tools.keyboard_mouse import register_keyboard_mouse_tools
+from tools.detector import register_detector_tools
+
+# Starlette 组件
 from starlette.staticfiles import StaticFiles
 from starlette.responses import Response, FileResponse
 from urllib.parse import parse_qs
 
-# Configuration
-PORT = 9999
-DOMAIN = "localhost"  # Public domain with IPv6
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
-SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "screenshots")
-os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-
-def load_config():
-    """Load configuration from config.json."""
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Warning: Failed to load config.json: {e}")
-    return {}
 
 def get_local_ip():
-    """Get the local IPv4 address of this machine."""
+    """获取本地 IPv4 地址"""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Try to connect to a public DNS server
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
         return ip
     except Exception:
         try:
-            # Fallback: Get hostname then IP
             hostname = socket.gethostname()
             return socket.gethostbyname(hostname)
         except Exception:
             return "127.0.0.1"
 
+
 def get_local_ipv6():
-    """Get the local IPv6 address of this machine."""
+    """获取本地 IPv6 地址"""
     try:
         s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-        s.connect(("2001:4860:4860::8888", 80))  # Google DNS IPv6
+        s.connect(("2001:4860:4860::8888", 80))
         ip = s.getsockname()[0]
         s.close()
         return ip
     except Exception:
-        # IPv6 fallback is harder, just return localhost
         return "::1"
 
-# Load config
+
+# ============================================================================
+# 配置加载
+# ============================================================================
 config = load_config()
-SAFE_ZONES = config.get("safe_zones", None)
+
+# 服务器配置
+server_enabled = get_config_value(config, "server.enabled", True)
+server_name = get_config_value(config, "server.name", "MyPC-MCP")
+server_port = get_config_value(config, "server.port", 9999)
+server_domain = get_config_value(config, "server.domain", "localhost")
+server_host = get_config_value(config, "server.host", "0.0.0.0")
+screenshots_dir = get_config_value(config, "server.screenshots_dir", "./screenshots")
+local_host_header = get_config_value(config, "server.local_host_header", "localhost:9999")
+
+# 创建截图目录
+SCREENSHOTS_DIR = os.path.abspath(screenshots_dir)
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+
+# 安全区配置（自动展开环境变量）
+SAFE_ZONES = get_safe_zones(config)
+
+# SSH 配置
 SSH_CONFIG = config.get("ssh", None)
 
+# 网络配置
+LOCAL_IP = get_local_ip()
+LOCAL_IPV6 = get_local_ipv6()
+BASE_URL = f"http://{server_domain}:{server_port}"
+
+# ============================================================================
+# 安全检查
+# ============================================================================
 def is_safe_path(path: str) -> bool:
-    """Check if path is within any safe zone."""
+    """检查路径是否在安全区内"""
     if not SAFE_ZONES:
-        # Defaults if not configured
+        # 默认安全区
         default_zones = [
             os.path.expanduser("~/Documents"),
             os.path.expanduser("~/Downloads"),
@@ -80,18 +111,17 @@ def is_safe_path(path: str) -> bool:
 
     try:
         abs_path = os.path.abspath(path)
-        # Normalize path case for Windows
         norm_path = os.path.normcase(abs_path)
 
         for zone in zones:
             abs_zone = os.path.abspath(zone)
             norm_zone = os.path.normcase(abs_zone)
 
-            # Check if it's the zone itself
+            # 检查是否是安全区本身
             if norm_path == norm_zone:
                 return True
 
-            # Check if it's a file inside the zone
+            # 检查是否是安全区内的文件
             if not norm_zone.endswith(os.sep):
                 norm_zone += os.sep
 
@@ -103,38 +133,73 @@ def is_safe_path(path: str) -> bool:
         return False
 
 
-LOCAL_IP = get_local_ip()
-LOCAL_IPV6 = get_local_ipv6()
-BASE_URL = f"http://{DOMAIN}:{PORT}"  # Use domain for public access
+# ============================================================================
+# MCP 服务器初始化
+# ============================================================================
+print(f"Initializing {server_name}...")
+mcp = FastMCP(server_name)
 
-# Initialize FastMCP server
-mcp = FastMCP("MyPC-MCP")
+# 注册所有工具
+print("Registering tools:")
 
-# Register tools (pass config)
-register_screen_tools(mcp, SCREENSHOTS_DIR, BASE_URL)
+# 屏幕工具
+print("  - Screen tools (screenshot, webcam)")
+register_screen_tools(mcp, SCREENSHOTS_DIR, BASE_URL, config)
+
+# 系统工具
+print("  - System tools (volume, power, status)")
 register_system_tools(mcp)
+
+# 文件工具
+print("  - File tools (read, write, search)")
 register_file_tools(mcp, safe_zones=SAFE_ZONES, base_url=BASE_URL)
-register_ssh_tools(mcp, ssh_config=SSH_CONFIG)
+
+# 窗口工具
+print("  - Window tools (process, clipboard, notification)")
 register_window_tools(mcp, SCREENSHOTS_DIR, BASE_URL)
+
+# 搜索工具
+print("  - Search tools (Everything)")
 register_search_tools(mcp, config=config)
 
+# Git Bash 工具
+print("  - Git Bash tools")
+register_bash_tools(mcp)
 
+# 键鼠工具
+print("  - Keyboard/Mouse tools")
+register_keyboard_mouse_tools(mcp)
+
+# 文件检测工具
+print("  - File detector tools")
+register_detector_tools(mcp)
+
+# SSH 工具
+if SSH_CONFIG:
+    print("  - SSH tools")
+    register_ssh_tools(mcp, ssh_config=SSH_CONFIG)
+
+print("All tools registered successfully!")
+
+
+# ============================================================================
+# HTTP 中间件和应用
+# ============================================================================
 class HostHeaderMiddleware:
     """
-    Middleware to rewrite Host header to localhost for MCP validation.
-    This allows external connections while satisfying MCP's internal checks.
+    中间件：重写 Host 头为 localhost 以满足 MCP 验证
+    允许外部连接同时满足 MCP 内部检查
     """
-    def __init__(self, app):
+    def __init__(self, app, local_host):
         self.app = app
+        self.local_host = local_host.encode()
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            # Rewrite headers to make Host appear as localhost
-            headers = dict(scope.get("headers", []))
             new_headers = []
             for key, value in scope.get("headers", []):
                 if key == b"host":
-                    new_headers.append((b"host", b"localhost:9999"))
+                    new_headers.append((b"host", self.local_host))
                 else:
                     new_headers.append((key, value))
             scope = dict(scope)
@@ -144,7 +209,7 @@ class HostHeaderMiddleware:
 
 class CombinedApp:
     """
-    Combines MCP SSE app with static file serving and secure downloads.
+    组合应用：整合 MCP SSE、静态文件服务和安全下载
     """
     def __init__(self, mcp_app, static_dir):
         self.mcp_app = mcp_app
@@ -155,13 +220,13 @@ class CombinedApp:
         query_string = scope.get("query_string", b"").decode("utf-8")
 
         if path.startswith("/screenshots"):
-            # Serve static files
+            # 静态文件服务
             scope = dict(scope)
-            scope["path"] = path[len("/screenshots"):]  # Remove prefix
+            scope["path"] = path[len("/screenshots"):]
             await self.static_app(scope, receive, send)
 
         elif path == "/download":
-            # Secure file download
+            # 安全文件下载
             params = parse_qs(query_string)
             file_path_list = params.get("path")
 
@@ -172,46 +237,61 @@ class CombinedApp:
 
             file_path = file_path_list[0]
 
-            # Security check
+            # 安全检查
             if not os.path.exists(file_path):
-                 response = Response("Error: File not found.", status_code=404)
-                 await response(scope, receive, send)
-                 return
+                response = Response("Error: File not found.", status_code=404)
+                await response(scope, receive, send)
+                return
 
             if not is_safe_path(file_path):
-                 response = Response("Error: Access denied. File is not in a Safe Zone.", status_code=403)
-                 await response(scope, receive, send)
-                 return
+                response = Response("Error: Access denied. File is not in a Safe Zone.", status_code=403)
+                await response(scope, receive, send)
+                return
 
-            # Serve file
+            # 提供文件
             filename = os.path.basename(file_path)
             response = FileResponse(file_path, filename=filename)
             await response(scope, receive, send)
 
         else:
-            # Forward to MCP
+            # 转发到 MCP
             await self.mcp_app(scope, receive, send)
 
 
+# ============================================================================
+# 主程序
+# ============================================================================
 if __name__ == "__main__":
     import uvicorn
-    print(f"Starting MyPC-MCP on port {PORT} (SSE mode)...")
-    print(f"Domain: {DOMAIN}")
+
+    print("\n" + "=" * 60)
+    print(f"Starting {server_name} on port {server_port} (SSE mode)...")
+    print("=" * 60)
+    print(f"Server Name: {server_name}")
+    print(f"Domain: {server_domain}")
     print(f"Local IPv4: {LOCAL_IP}")
     print(f"Local IPv6: {LOCAL_IPV6}")
     print(f"Screenshots URL: {BASE_URL}/screenshots/")
+    print()
+
     if SAFE_ZONES:
-        print(f"Safe Zones (from config.json):")
+        print("Safe Zones (from config.json):")
         for zone in SAFE_ZONES:
             print(f"  - {zone}")
     else:
         print("Safe Zones: Using defaults (Documents, Downloads, Desktop)")
-    print("Accepting connections from all hosts (IPv4 + IPv6)...")
 
-    # Create combined app
+    print()
+    print("=" * 60)
+    print("Accepting connections from all hosts (IPv4 + IPv6)...")
+    print("Press Ctrl+C to stop the server")
+    print("=" * 60)
+    print()
+
+    # 创建组合应用
     mcp_app = mcp.sse_app()
     combined = CombinedApp(mcp_app, SCREENSHOTS_DIR)
-    app = HostHeaderMiddleware(combined)
+    app = HostHeaderMiddleware(combined, local_host_header)
 
-    # Use "::" to listen on both IPv4 and IPv6
-    uvicorn.run(app, host="::", port=PORT)
+    # 使用 "::" 监听 IPv4 和 IPv6
+    uvicorn.run(app, host=server_host, port=server_port)

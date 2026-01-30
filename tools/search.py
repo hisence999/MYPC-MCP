@@ -1,73 +1,86 @@
+"""
+文件搜索工具 - 使用 Everything
+
+提供基于 Everything 的快速文件搜索功能
+"""
+
 import subprocess
 import os
 from mcp.server.fastmcp import FastMCP
+from utils.config import load_config, find_executable, get_config_value
 
-# Default paths to look for es.exe
-ES_PATHS = [
-    r"C:\Program Files\Everything\es.exe",
-    r"C:\Program Files (x86)\Everything\es.exe",
-    r"D:\APP\Everything\es.exe",
-    "es.exe"  # In PATH
-]
 
-def find_es_executable(configured_path: str = None) -> str:
-    """Find the Everything Command-line Interface (es.exe)."""
-    if configured_path and os.path.exists(configured_path):
-        return configured_path
+def find_es_executable(config):
+    """查找 Everything 命令行接口 (es.exe)"""
+    everything_paths = config.get("paths", {}).get("everything", [
+        r"C:\Program Files\Everything\es.exe",
+        r"C:\Program Files (x86)\Everything\es.exe",
+        r"D:\APP\Everything\es.exe",
+        "es.exe"
+    ])
 
-    for path in ES_PATHS:
-        if os.path.exists(path):
-            return path
+    return find_executable(everything_paths)
 
-    # Check PATH
-    import shutil
-    if shutil.which("es.exe"):
-        return "es.exe"
-
-    return None
 
 def register_search_tools(mcp: FastMCP, config: dict = None):
     """
-    Register file search tools using Everything (es.exe).
+    注册使用 Everything (es.exe) 的文件搜索工具
 
     Args:
-        mcp: FastMCP instance
-        config: Configuration dictionary potentially containing 'everything_path'
+        mcp: FastMCP 实例
+        config: 配置字典
     """
 
-    # Get es.exe path from config or auto-detect
-    es_path_config = config.get("everything_path") if config else None
-    es_path = find_es_executable(es_path_config)
+    # 获取 es.exe 路径
+    es_path = find_es_executable(config) if config else None
+    default_limit = get_config_value(config, "search.default_limit", 20) if config else 20
 
     @mcp.tool(name="MyPC-search_files")
-    def search_files(query: str, limit: int = 20) -> str:
+    def search_files(query: str, limit: int = None) -> str:
         """
-        Search for files and folders using 'Everything' (es.exe).
+        使用 'Everything' (es.exe) 搜索文件和文件夹
 
-        This tool supports Everything's powerful search syntax:
-        - Wildcards: "*.py", "log*.txt"
-        - Extensions: "ext:png;jpg", "ext:doc"
-        - Type macros: "pic:", "audio:", "video:", "exe:"
-        - Logic: "foo bar" (AND), "foo | bar" (OR), "!foo" (NOT)
-        - Paths: "D:\Downloads\ *.zip"
+        此工具支持 Everything 的强大搜索语法：
+        - 通配符: "*.py", "log*.txt"
+        - 扩展名: "ext:png;jpg", "ext:doc"
+        - 类型宏: "pic:", "audio:", "video:", "exe:"
+        - 逻辑: "foo bar" (AND), "foo | bar" (OR), "!foo" (NOT)
+        - 路径: "D:\Downloads\ *.zip"
 
-        Args:
-            query: The search query (e.g., "config.json", "*.py", "project notes")
-            limit: Maximum number of results to return (default: 20)
+        参数:
+            query: 搜索查询（例如 "config.json", "*.py", "项目笔记"）
+            limit: 返回的最大结果数（默认: 20）
 
-        Returns:
-            List of matching file paths.
+        返回:
+            匹配文件路径列表
         """
+        if limit is None:
+            limit = default_limit
+
         if not es_path:
-            return "Error: 'es.exe' (Everything CLI) not found. Please install it to D:\\APP\\Everything\\ or configure 'everything_path' in config.json."
+            return """错误: 未找到 'es.exe' (Everything CLI)。
+
+请安装 Everything 搜索工具：
+1. 下载: https://www.voidtools.com/
+2. 安装到默认位置或在 config.json 中配置路径
+
+配置示例:
+{
+    "paths": {
+        "everything": [
+            "C:\\\\Program Files\\\\Everything\\\\es.exe",
+            "D:\\\\APP\\\\Everything\\\\es.exe"
+        ]
+    }
+}"""
 
         try:
-            # Construct command
-            # -n <num>: limit results
+            # 构建命令
+            # -n <num>: 限制结果数
             cmd = [es_path, str(query), "-n", str(limit)]
 
-            # Run search
-            # creationflags=0x08000000 (CREATE_NO_WINDOW) prevents cmd window popping up
+            # 运行搜索
+            # creationflags=0x08000000 (CREATE_NO_WINDOW) 防止 cmd 窗口弹出
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -78,24 +91,24 @@ def register_search_tools(mcp: FastMCP, config: dict = None):
             )
 
             if result.returncode != 0:
-                return f"Search error: {result.stderr}"
+                return f"搜索错误: {result.stderr}"
 
             output = result.stdout.strip()
 
             if not output:
-                return f"No results found for '{query}'"
+                return f"未找到 '{query}' 的结果"
 
-            # Format output
+            # 格式化输出
             lines = output.split('\n')
             count = len(lines)
 
-            response = [f"Found {count} results for '{query}':"]
+            response = [f"找到 {count} 个 '{query}' 的结果:"]
             response.extend(lines)
 
             if count >= limit:
-                response.append(f"\n(Showing first {limit} results)")
+                response.append(f"\n(显示前 {limit} 个结果)")
 
             return "\n".join(response)
 
         except Exception as e:
-            return f"Error executing search: {str(e)}"
+            return f"执行搜索时出错: {str(e)}"

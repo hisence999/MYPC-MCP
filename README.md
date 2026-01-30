@@ -1,371 +1,827 @@
 # MYPC-MCP
 
-**English** | [中文](#中文)
-
-A Model Context Protocol (MCP) server that gives AI agents comprehensive control over a local Windows PC.
+[English](#english) | [中文](#中文)
 
 ---
 
-## Features
+<a name="english"></a>
+## English
 
-- 🖥️ **Screen Capture**: Full screen, active window, and webcam screenshots with optional AI analysis.
-- 🪟 **Window Management**: List windows, get active window info, manage processes.
-- 📁 **File Operations**: Read, write, edit, search, and manage files with safety zones.
-- 🌐 **SSH Remote Access**: Execute commands on remote Linux servers with command whitelisting.
-- 📊 **System Control**: Adjust volume, lock screen, show notifications, get hardware status.
-- 🖱️ **Input Automation**: (Planned) Focus windows and simulate keyboard input.
-- 📝 **Clipboard**: Read and write clipboard content.
+A powerful Model Context Protocol (MCP) server that provides AI agents with comprehensive control over a local Windows PC. MYPC-MCP acts as an AI assistant butler, giving AI vision (screenshots), hearing (system status), hands (control), and voice (automation) capabilities.
+
+### 🚀 Key Features
+
+- **🖥️ Screen Tools**: Full screen, active window, and webcam capture with AI analysis
+- **🪟 Window Management**: List, focus, minimize, maximize, close windows
+- **📁 File Operations**: Read, write, edit, copy, move, delete with safety zones
+- **🔍 File Search**: Fast search using Everything integration
+- **⌨️ Keyboard & Mouse**: Text input and hotkey automation
+- **🧠 Smart Detection**: Auto-detect active window's file path
+- **🌐 SSH Remote**: Execute commands on remote Linux servers
+- **📊 System Control**: Volume, power, notifications, hardware status
+- **📋 Clipboard**: Read and write clipboard content
+- **🐧 Bash Shell**: Execute Git Bash commands with blacklist protection
 
 ---
 
-## Installation
+## 🛠️ Quick Start
 
-### Prerequisites
+### One-Line Installation (Windows)
 
-- Python 3.10 or higher
-- Windows 10/11
+```batch
+# Double-click to run - automatically checks and installs everything
+start.bat
+```
 
-### Setup
+Or manually:
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/hisence999/MYPC-MCP.git
-   cd MYPC-MCP
-   ```
+```batch
+# Install
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 
-2. **Create a virtual environment**:
-   ```bash
-   python -m venv venv
-   ```
-
-3. **Activate the virtual environment**:
-   - **Windows (Command Prompt)**:
-     ```bash
-     venv\Scripts\activate
-     ```
-   - **Windows (PowerShell)**:
-     ```bash
-     venv\Scripts\Activate.ps1
-     ```
-
-4. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. **Configure the server**:
-   - Copy `config.example.json` to `config.json`.
-   - Edit `config.json` with your settings:
-     - **Safe Zones**: Folders where write operations are allowed (e.g., your Documents folder).
-     - **VLM API**: (Optional) Configure a Vision Language Model API for AI image analysis.
-     - **SSH Hosts**: (Optional) Configure remote Linux servers for management.
-
-6. **Run the server**:
-   ```bash
-   python main.py
-   ```
+# Start
+python main.py
+```
 
 The server will start on `http://localhost:9999` by default.
 
 ---
 
-## Tools
+## 📖 Configuration
 
-### Screen Tools
-- `MyPC-take_screenshot`: Capture full screen or specific monitor.
-- `MyPC-screenshot_active_window`: Capture active window only.
-- `MyPC-take_webcam_photo`: Capture photo from webcam.
-- `MyPC-list_monitors`: List available monitors.
+### Basic Config (config.json)
 
-### Window Tools
-- `MyPC-get_active_window`: Get info about the active window.
-- `MyPC-list_windows`: List all visible windows.
-- `MyPC-focus_window`: Bring a specific window to the foreground.
-- `MyPC-list_processes`: List running processes with resource usage.
-- `MyPC-show_notification`: Send a Windows Toast notification.
+```json
+{
+    "server": {
+        "enabled": true,
+        "name": "MyPC-MCP",
+        "port": 9999,
+        "host": "0.0.0.0",
+        "domain": "localhost"
+    },
+    "safe_zones": [
+        "%USERPROFILE%\\Documents",
+        "%USERPROFILE%\\Downloads",
+        "%USERPROFILE%\\Desktop",
+        "D:\\"
+    ]
+}
+```
 
-### File Tools
-- `MyPC-read_file`: Read text, Word (.docx), Excel (.xlsx), PPT (.pptx), and PDF files.
-- `MyPC-write_file`: Write text to a file.
-- `MyPC-edit_file`: Search and replace text in a file.
-- `MyPC-list_directory`: List contents of a directory.
-- `MyPC-search_files`: Search for files using "Everything" (must be installed).
-- `MyPC-copy_file`, `MyPC-move_file`, `MyPC-delete_file`: File management.
+### Network Access Modes
 
-### SSH Tools
-- `MyPC-ssh_list_hosts`: List configured SSH hosts.
-- `MyPC-ssh_execute`: Execute a command on a remote server.
-- `MyPC-ssh_test_connection`: Test connectivity to a remote server.
+**Local Only** (default):
+```json
+{
+    "server": {
+        "host": "127.0.0.1",
+        "domain": "localhost"
+    }
+}
+```
 
-### System Tools
-- `MyPC-set_volume`: Adjust system volume.
-- `MyPC-lock_screen`: Lock the workstation.
-- `MyPC-get_hardware_status`: Get CPU, memory, GPU, and disk info.
+**LAN Access**:
+```json
+{
+    "server": {
+        "host": "0.0.0.0",
+        "domain": "192.168.1.100"
+    }
+}
+```
+
+Run `setup-firewall.bat` as Administrator to allow port 9999.
 
 ---
 
-## Configuration
+## 🛠️ Available Tools
+
+### Screen & Vision
+- `MyPC-take_screenshot` - Capture full screen or specific monitor
+- `MyPC-screenshot_active_window` - Capture active window only
+- `MyPC-take_webcam_photo` - Capture from webcam
+- `MyPC-list_monitors` - List all monitors
+
+### Window Management
+- `MyPC-get_active_window` - Get active window info
+- `MyPC-list_windows` - List all visible windows
+- `MyPC-focus_window` - Focus a window by title/process
+- `MyPC-minimize_window` - Minimize a window
+- `MyPC-maximize_window` - Maximize a window
+- `MyPC-close_window` - Close a window
+- `MyPC-screenshot_active_window` - Screenshot active window
+- `MyPC-get_browser_url` - Get browser URL from address bar
+- `MyPC-get_focused_control` - Get focused UI control info
+
+### Process Management
+- `MyPC-list_processes` - List processes by CPU/memory usage
+- `MyPC-kill_process` - Kill process by name or PID
+- `MyPC-open_app` - Open application
+
+### File Operations
+- `MyPC-list_directory` - List directory contents
+- `MyPC-read_file` - Read files (txt, docx, xlsx, pptx, pdf)
+- `MyPC-write_file` - Write text to file (safe zones only)
+- `MyPC-edit_file` - Search and replace in file
+- `MyPC-copy_file` - Copy file (into safe zones only)
+- `MyPC-move_file` - Move/rename file (safe zones only)
+- `MyPC-delete_file` - Delete file (moves to Recycle Bin)
+- `MyPC-get_file_info` - Get detailed file information
+- `MyPC-search_files` - Search files using Everything
+
+### File Search & Detection
+- `MyPC-search_files` - Fast file search via Everything
+- `MyPC-detect_active_file` - Smart detection of active window's file
+
+### Input Automation
+- `type_text` - Type text (supports Chinese via clipboard)
+- `hotkey` - Press hotkey combinations
+
+### Clipboard
+- `MyPC-get_clipboard` - Get clipboard content
+- `MyPC-set_clipboard` - Set clipboard content
+
+### System Control
+- `MyPC-get_system_status` - Get CPU, memory, battery status
+- `MyPC-set_volume` / `MyPC-get_volume` - Volume control
+- `MyPC-lock_screen` - Lock workstation
+- `MyPC-sleep_display` - Turn off display
+- `MyPC-hibernate` - Hibernate system
+
+### Notifications
+- `MyPC-show_notification` - Show Windows Toast notification
+
+### Hardware
+- `MyPC-get_hardware_status` - CPU, GPU, memory, disk info
+
+### Bash Shell
+- `MyPC-bash` - Execute Git Bash commands
+- `MyPC-bash_blocked` - List blocked commands
+- `MyPC-bash_status` - Check Bash installation
+
+### SSH Remote
+- `MyPC-ssh_list_hosts` - List configured SSH hosts
+- `MyPC-ssh_execute` - Execute remote command
+- `MyPC-ssh_test_connection` - Test SSH connection
+- `MyPC-ssh_allowed_commands` - List allowed commands
+
+### Utilities
+- `MyPC-delay` - Delay execution (1-120 seconds)
+
+---
+
+## 📚 Usage Examples
+
+### Example 1: Read and Edit a File
+
+```python
+# List files in Documents
+MyPC-list_directory(path="%USERPROFILE%\\Documents")
+
+# Read a file
+MyPC-read_file(path="%USERPROFILE%\\Documents\\notes.txt")
+
+# Edit the file
+MyPC-edit_file(
+    path="%USERPROFILE%\\Documents\\notes.txt",
+    search_text="old text",
+    replace_text="new text"
+)
+```
+
+### Example 2: Browser Automation
+
+```python
+# Get current browser URL
+MyPC-get_browser_url()
+
+# Take a screenshot with AI analysis
+MyPC-take_screenshot(display_index=1, ai_analysis=True)
+
+# Copy URL to clipboard
+MyPC-set_clipboard(text="https://example.com")
+```
+
+### Example 3: Window Management
+
+```python
+# List all windows
+MyPC-list_windows()
+
+# Focus Notepad
+MyPC-focus_window(title="Notepad")
+
+# Type something
+type_text(text="Hello World", enter=True)
+
+# Save and close
+hotkey(keys=["ctrl", "s"])
+MyPC-close_window(title="Notepad")
+```
+
+### Example 4: File Search
+
+```python
+# Search for Python files
+MyPC-search_files(query="*.py", limit=20)
+
+# Search in specific directory
+MyPC-search_files(query="project notes ext:pdf")
+```
+
+### Example 5: Smart File Detection
+
+```python
+# Detect which file is currently open
+MyPC-detect_active_file()
+# Returns: {
+#   "path": "D:\\Projects\\main.py",
+#   "filename": "main.py",
+#   "software": "Python",
+#   "strategy": "标题路径提取"
+# }
+```
+
+### Example 6: Remote SSH Execution
+
+```python
+# List SSH hosts
+MyPC-ssh_list_hosts()
+
+# Execute command on remote server
+MyPC-ssh_execute(host="MyServer", command="docker ps")
+```
+
+---
+
+## 🔒 Security
 
 ### Safe Zones
 
-Define folders where file write operations are allowed. By default, this includes your Documents, Downloads, and Desktop.
+File operations are categorized by permission level:
 
-### AI Analysis (Optional)
+- **Read Operations**: Any directory
+- **Write Operations**: Only in configured safe zones
+- **Copy Operations**: Can copy INTO safe zones only
 
-To enable AI analysis for screenshots, configure a VLM (Vision Language Model) API in `config.json`:
+### SSH Security
+
+- Command whitelist mechanism
+- Password and key file authentication
+- Encoded connection support
+
+### Data Protection
+
+- Recycle Bin for file deletions
+- No permanent data loss by default
+- Path validation and normalization
+
+---
+
+## 🔧 Advanced Configuration
+
+### Environment Variables
+
+Config supports environment variable expansion:
+- `%USERPROFILE%` - User profile directory
+- `%APPDATA%` - Application data
+- `%TEMP%` - Temporary folder
+- `~` - Home directory
+
+### Everything Search
+
+To enable fast file search, install [Everything](https://www.voidtools.com/) and configure path in `config.json`:
 
 ```json
-"vlm": {
-    "base_url": "https://open.bigmodel.cn/api/paas/v4",
-    "api_key": "YOUR_API_KEY",
-    "model": "glm-4.6v",
-    "prompt": "Please identify all text in this image."
+{
+    "paths": {
+        "everything": [
+            "C:\\Program Files\\Everything\\es.exe",
+            "D:\\APP\\Everything\\es.exe"
+        ]
+    }
 }
 ```
 
-### SSH Hosts
+### Git Bash
 
-Configure remote Linux servers for command execution:
+Configure Git Bash path in `config.json`:
 
 ```json
-"ssh": {
-    "hosts": {
-        "MyServer": {
-            "host": "192.168.1.100",
-            "port": 22,
-            "user": "username",
-            "password": "password"
-        }
-    },
-    "allowed_commands": ["docker", "git", "ls", ...]
+{
+    "paths": {
+        "git_bash": [
+            "C:\\Program Files\\Git\\bin\\bash.exe"
+        ]
+    }
+}
+```
+
+### AI Analysis (VLM)
+
+Configure Vision Language Model for screenshot analysis:
+
+```json
+{
+    "vlm": {
+        "enabled": true,
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": "your_api_key_here",
+        "model": "glm-4.6v",
+        "prompt": "Please identify all text in this image."
+    }
 }
 ```
 
 ---
 
-## Security
+## 📁 Project Structure
 
-- **Safe Zones**: Write operations are restricted to configured directories only.
-- **SSH Whitelist**: Commands executed on remote servers must be in a whitelist.
-- **Recycle Bin**: File deletions move files to the Recycle Bin instead of permanent deletion.
-
----
-
-## Development
-
-### Project Structure
-
-- `main.py`: Server entry point.
-- `tools/`: Tool modules (screen, files, ssh, window, system).
-- `config.json`: Configuration file.
-- `requirements.txt`: Python dependencies.
-
-### Adding New Tools
-
-To add a new tool, register it in the appropriate module:
-
-```python
-@mcp.tool(name="MyPC-my_tool")
-def my_tool(param: str) -> str:
-    """Tool description."""
-    # Your logic here
-    return "Result"
+```
+MYPC-MCP/
+├── main.py                   # Server entry point
+├── config.example.json       # Configuration template
+├── config.json              # Your configuration (gitignored)
+├── requirements.txt          # Python dependencies
+├── start.bat               # Quick start script
+├── install.bat             # Installation script
+├── stop.bat                # Stop server script
+├── setup-firewall.bat      # Firewall configuration
+├── tools/                   # Tool modules
+│   ├── screen.py            # Screen & webcam tools
+│   ├── system.py            # System control tools
+│   ├── files.py             # File management tools
+│   ├── window.py            # Window management tools
+│   ├── search.py            # File search tools
+│   ├── ssh.py               # SSH remote tools
+│   ├── bash.py              # Git Bash tools
+│   ├── keyboard_mouse.py    # Keyboard & mouse automation
+│   ├── detector.py          # Smart file detection
+│   └── detect_active_file.py # File detection implementation
+├── utils/                   # Utility modules
+│   └── config.py            # Configuration loader
+└── screenshots/             # Screenshot storage
 ```
 
 ---
 
-## License
+## 🌐 Network Access
+
+### Local Access
+
+```bash
+# Start server
+python main.py
+
+# Access from same machine
+http://localhost:9999
+```
+
+### LAN Access
+
+1. Configure firewall (run `setup-firewall.bat` as Administrator)
+2. Edit `config.json`:
+   ```json
+   {
+       "server": {
+           "host": "0.0.0.0",
+           "domain": "YOUR_LAN_IP"
+       }
+   }
+   ```
+3. Access from LAN: `http://YOUR_LAN_IP:9999`
+
+### WAN Access
+
+1. Configure router port forwarding (External 9999 → Your PC:9999)
+2. Run `setup-firewall.bat` as Administrator
+3. Configure domain or use public IP
+
+See [NETWORK.md](NETWORK.md) for detailed guide.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit Pull Request.
+
+---
+
+## 📄 License
 
 MIT License
 
 ---
 
-## Contributing
+<a name="中文"></a>
+## 中文
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+一个强大的基于 Model Context Protocol (MCP) 的 Windows 电脑控制服务器。MYPC-MCP 充当 AI 智能体的管家，赋予 AI 视觉（截图）、听觉（系统状态）、手脚（控制）和语音（自动化）能力。
 
----
+### 🚀 核心功能
 
-# 中文
-
-一个基于 Model Context Protocol (MCP) 的服务器，允许 AI 智能体全面控制本地 Windows 电脑。
-
----
-
-## 功能特性
-
-- 🖥️ **屏幕截取**：支持全屏、活动窗口和网络摄像头截图，并可选择进行 AI 分析。
-- 🪟 **窗口管理**：列出窗口、获取活动窗口信息、管理进程。
-- 📁 **文件操作**：读取、写入、编辑、搜索和管理文件，具备安全区保护。
-- 🌐 **SSH 远程访问**：通过命令白名单在远程 Linux 服务器上执行命令。
-- 📊 **系统控制**：调整音量、锁屏、显示通知、获取硬件状态。
-- 🖱️ **输入自动化**：（计划中）聚焦窗口并模拟键盘输入。
-- 📝 **剪贴板**：读取和写入剪贴板内容。
+- **🖥️ 屏幕工具**：全屏、活动窗口、网络摄像头截图，支持 AI 分析
+- **🪟 窗口管理**：列出、聚焦、最小化、最大化、关闭窗口
+- **📁 文件操作**：读取、写入、编辑、复制、移动、删除文件，具备安全区保护
+- **🔍 文件搜索**：通过 Everything 集成实现快速文件搜索
+- **⌨️ 键鼠自动化**：文本输入和快捷键自动化
+- **🧠 智能检测**：自动检测活动窗口关联的文件路径
+- **🌐 SSH 远程**：在远程 Linux 服务器上执行命令
+- **📊 系统控制**：音量、电源、通知、硬件状态
+- **📋 剪贴板**：读取和写入剪贴板内容
+- **🐧 Bash Shell**：执行 Git Bash 命令（带黑名单保护）
 
 ---
 
-## 安装
+## 🛠️ 快速开始
 
-### 前置要求
+### 一键安装（Windows）
 
-- Python 3.10 或更高版本
-- Windows 10/11
+```batch
+# 双击运行 - 自动检查并安装所有依赖
+start.bat
+```
 
-### 设置步骤
+或手动安装：
 
-1. **克隆仓库**：
-   ```bash
-   git clone https://github.com/hisence999/MYPC-MCP.git
-   cd MYPC-MCP
-   ```
+```batch
+# 安装
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
 
-2. **创建虚拟环境**：
-   ```bash
-   python -m venv venv
-   ```
+# 启动
+python main.py
+```
 
-3. **激活虚拟环境**：
-   - **Windows (命令提示符)**：
-     ```bash
-     venv\Scripts\activate
-     ```
-   - **Windows (PowerShell)**：
-     ```bash
-     venv\Scripts\Activate.ps1
-     ```
-
-4. **安装依赖**：
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. **配置服务器**：
-   - 将 `config.example.json` 复制为 `config.json`。
-   - 编辑 `config.json` 填入您的设置：
-     - **安全区**：允许写入操作的文件夹（例如您的文档文件夹）。
-     - **VLM API**：（可选）配置视觉语言模型 API 以启用 AI 图像分析。
-     - **SSH 主机**：（可选）配置远程 Linux 服务器以进行管理。
-
-6. **运行服务器**：
-   ```bash
-   python main.py
-   ```
-
-服务器将默认在 `http://localhost:9999` 上启动。
+服务器默认在 `http://localhost:9999` 上启动。
 
 ---
 
-## 工具列表
+## 📖 配置说明
 
-### 屏幕工具
-- `MyPC-take_screenshot`：截取全屏或特定显示器。
-- `MyPC-screenshot_active_window`：仅截取活动窗口。
-- `MyPC-take_webcam_photo`：从网络摄像头拍照。
-- `MyPC-list_monitors`：列出可用显示器。
+### 基础配置 (config.json)
 
-### 窗口工具
-- `MyPC-get_active_window`：获取活动窗口信息。
-- `MyPC-list_windows`：列出所有可见窗口。
-- `MyPC-focus_window`：将特定窗口置于前台。
-- `MyPC-list_processes`：列出运行中的进程及其资源使用情况。
-- `MyPC-show_notification`：发送 Windows Toast 通知。
+```json
+{
+    "server": {
+        "enabled": true,
+        "name": "MyPC-MCP",
+        "port": 9999,
+        "host": "0.0.0.0",
+        "domain": "localhost"
+    },
+    "safe_zones": [
+        "%USERPROFILE%\\Documents",
+        "%USERPROFILE%\\Downloads",
+        "%USERPROFILE%\\Desktop",
+        "D:\\"
+    ]
+}
+```
 
-### 文件工具
-- `MyPC-read_file`：读取文本、Word (.docx)、Excel (.xlsx)、PPT (.pptx) 和 PDF 文件。
-- `MyPC-write_file`：将文本写入文件。
-- `MyPC-edit_file`：在文件中搜索并替换文本。
-- `MyPC-list_directory`：列出目录内容。
-- `MyPC-search_files`：使用 "Everything" 搜索文件（需安装）。
-- `MyPC-copy_file`、`MyPC-move_file`、`MyPC-delete_file`：文件管理。
+### 网络访问模式
 
-### SSH 工具
-- `MyPC-ssh_list_hosts`：列出已配置的 SSH 主机。
-- `MyPC-ssh_execute`：在远程服务器上执行命令。
-- `MyPC-ssh_test_connection`：测试到远程服务器的连接。
+**仅本地访问**（默认）：
+```json
+{
+    "server": {
+        "host": "127.0.0.1",
+        "domain": "localhost"
+    }
+}
+```
 
-### 系统工具
-- `MyPC-set_volume`：调整系统音量。
-- `MyPC-lock_screen`：锁定工作站。
-- `MyPC-get_hardware_status`：获取 CPU、内存、GPU 和磁盘信息。
+**局域网访问**：
+```json
+{
+    "server": {
+        "host": "0.0.0.0",
+        "domain": "192.168.1.100"
+    }
+}
+```
+
+以管理员身份运行 `setup-firewall.bat` 允许端口 9999。
 
 ---
 
-## 配置说明
+## 🛠️ 可用工具
+
+### 屏幕与视觉
+- `MyPC-take_screenshot` - 截取全屏或指定显示器
+- `MyPC-screenshot_active_window` - 仅截取活动窗口
+- `MyPC-take_webcam_photo` - 从摄像头拍照
+- `MyPC-list_monitors` - 列出所有显示器
+
+### 窗口管理
+- `MyPC-get_active_window` - 获取活动窗口信息
+- `MyPC-list_windows` - 列出所有可见窗口
+- `MyPC-focus_window` - 按标题/进程聚焦窗口
+- `MyPC-minimize_window` - 最小化窗口
+- `MyPC-maximize_window` - 最大化窗口
+- `MyPC-close_window` - 关闭窗口
+- `MyPC-screenshot_active_window` - 截取活动窗口
+- `MyPC-get_browser_url` - 获取浏览器地址栏 URL
+- `MyPC-get_focused_control` - 获取焦点控件信息
+
+### 进程管理
+- `MyPC-list_processes` - 按 CPU/内存列出进程
+- `MyPC-kill_process` - 按名称或 PID 终止进程
+- `MyPC-open_app` - 打开应用程序
+
+### 文件操作
+- `MyPC-list_directory` - 列出目录内容
+- `MyPC-read_file` - 读取文件（txt、docx、xlsx、pptx、pdf）
+- `MyPC-write_file` - 写入文本文件（仅安全区）
+- `MyPC-edit_file` - 文件搜索替换
+- `MyPC-copy_file` - 复制文件（仅进入安全区）
+- `MyPC-move_file` - 移动/重命名文件（仅安全区）
+- `MyPC-delete_file` - 删除文件（移入回收站）
+- `MyPC-get_file_info` - 获取文件详细信息
+- `MyPC-search_files` - 使用 Everything 搜索文件
+
+### 文件搜索与检测
+- `MyPC-search_files` - 通过 Everything 快速搜索文件
+- `MyPC-detect_active_file` - 智能检测活动窗口的文件
+
+### 输入自动化
+- `type_text` - 输入文本（支持通过剪贴板输入中文）
+- `hotkey` - 按快捷键组合
+
+### 剪贴板
+- `MyPC-get_clipboard` - 获取剪贴板内容
+- `MyPC-set_clipboard` - 设置剪贴板内容
+
+### 系统控制
+- `MyPC-get_system_status` - 获取 CPU、内存、电池状态
+- `MyPC-set_volume` / `MyPC-get_volume` - 音量控制
+- `MyPC-lock_screen` - 锁定工作站
+- `MyPC-sleep_display` - 关闭显示器
+- `MyPC-hibernate` - 休眠系统
+
+### 通知
+- `MyPC-show_notification` - 显示 Windows Toast 通知
+
+### 硬件
+- `MyPC-get_hardware_status` - CPU、GPU、内存、磁盘信息
+
+### Bash Shell
+- `MyPC-bash` - 执行 Git Bash 命令
+- `MyPC-bash_blocked` - 列出被阻止的命令
+- `MyPC-bash_status` - 检查 Bash 安装
+
+### SSH 远程
+- `MyPC-ssh_list_hosts` - 列出配置的 SSH 主机
+- `MyPC-ssh_execute` - 执行远程命令
+- `MyPC-ssh_test_connection` - 测试 SSH 连接
+- `MyPC-ssh_allowed_commands` - 列出允许的命令
+
+### 实用工具
+- `MyPC-delay` - 延迟执行（1-120 秒）
+
+---
+
+## 📚 使用场景示例
+
+### 场景 1：读取和编辑文件
+
+```python
+# 列出文档目录的文件
+MyPC-list_directory(path="%USERPROFILE%\\Documents")
+
+# 读取文件
+MyPC-read_file(path="%USERPROFILE%\\Documents\\笔记.txt")
+
+# 编辑文件
+MyPC-edit_file(
+    path="%USERPROFILE%\\Documents\\笔记.txt",
+    search_text="旧文本",
+    replace_text="新文本"
+)
+```
+
+### 场景 2：浏览器自动化
+
+```python
+# 获取当前浏览器 URL
+MyPC-get_browser_url()
+
+# 截图并 AI 分析
+MyPC-take_screenshot(display_index=1, ai_analysis=True)
+
+# 复制 URL 到剪贴板
+MyPC-set_clipboard(text="https://example.com")
+```
+
+### 场景 3：窗口管理
+
+```python
+# 列出所有窗口
+MyPC-list_windows()
+
+# 聚焦记事本
+MyPC-focus_window(title="记事本")
+
+# 输入文本
+type_text(text="你好世界", enter=True)
+
+# 保存并关闭
+hotkey(keys=["ctrl", "s"])
+MyPC-close_window(title="记事本")
+```
+
+### 场景 4：文件搜索
+
+```python
+# 搜索 Python 文件
+MyPC-search_files(query="*.py", limit=20)
+
+# 在特定目录搜索
+MyPC-search_files(query="项目笔记 ext:pdf")
+```
+
+### 场景 5：智能文件检测
+
+```python
+# 检测当前打开的文件
+MyPC-detect_active_file()
+# 返回: {
+#   "path": "D:\\Projects\\main.py",
+#   "filename": "main.py",
+#   "software": "Python",
+#   "strategy": "标题路径提取"
+# }
+```
+
+### 场景 6：远程 SSH 执行
+
+```python
+# 列出 SSH 主机
+MyPC-ssh_list_hosts()
+
+# 在远程服务器执行命令
+MyPC-ssh_execute(host="MyServer", command="docker ps")
+```
+
+---
+
+## 🔒 安全性
 
 ### 安全区
 
-定义允许进行文件写入操作的文件夹。默认情况下，这包括您的文档、下载和桌面文件夹。
+文件操作按权限级别分类：
 
-### AI 分析（可选）
+- **只读操作**：任意目录
+- **写入操作**：仅在配置的安全区内
+- **复制操作**：只能复制进入安全区
 
-要启用截图的 AI 分析功能，请在 `config.json` 中配置 VLM（视觉语言模型）API：
+### SSH 安全
+
+- 命令白名单机制
+- 密码和密钥文件认证
+- 编码连接支持
+
+### 数据保护
+
+- 文件删除移入回收站
+- 默认无永久数据丢失
+- 路径验证和规范化
+
+---
+
+## 🔧 高级配置
+
+### 环境变量
+
+配置支持环境变量扩展：
+- `%USERPROFILE%` - 用户目录
+- `%APPDATA%` - 应用数据目录
+- `%TEMP%` - 临时文件夹
+- `~` - 主目录
+
+### Everything 搜索
+
+启用快速文件搜索，安装 [Everything](https://www.voidtools.com/) 并在 `config.json` 中配置路径：
 
 ```json
-"vlm": {
-    "base_url": "https://open.bigmodel.cn/api/paas/v4",
-    "api_key": "YOUR_API_KEY",
-    "model": "glm-4.6v",
-    "prompt": "请识别这张图片中的所有文字。"
+{
+    "paths": {
+        "everything": [
+            "C:\\Program Files\\Everything\\es.exe",
+            "D:\\APP\\Everything\\es.exe"
+        ]
+    }
 }
 ```
 
-### SSH 主机
+### Git Bash
 
-配置远程 Linux 服务器以执行命令：
+在 `config.json` 中配置 Git Bash 路径：
 
 ```json
-"ssh": {
-    "hosts": {
-        "MyServer": {
-            "host": "192.168.1.100",
-            "port": 22,
-            "user": "username",
-            "password": "password"
-        }
-    },
-    "allowed_commands": ["docker", "git", "ls", ...]
+{
+    "paths": {
+        "git_bash": [
+            "C:\\Program Files\\Git\\bin\\bash.exe"
+        ]
+    }
+}
+```
+
+### AI 分析（VLM）
+
+配置视觉语言模型用于截图分析：
+
+```json
+{
+    "vlm": {
+        "enabled": true,
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": "your_api_key_here",
+        "model": "glm-4.6v",
+        "prompt": "请识别这张图片中的所有文字。"
+    }
 }
 ```
 
 ---
 
-## 安全性
+## 📁 项目结构
 
-- **安全区**：文件写入操作仅限于配置的目录。
-- **SSH 白名单**：在远程服务器上执行的命令必须在白名单中。
-- **回收站**：文件删除操作会将文件移至回收站，而不是永久删除。
-
----
-
-## 开发
-
-### 项目结构
-
-- `main.py`：服务器入口点。
-- `tools/`：工具模块（screen、files、ssh、window、system）。
-- `config.json`：配置文件。
-- `requirements.txt`：Python 依赖项。
-
-### 添加新工具
-
-要添加新工具，请在相应模块中注册：
-
-```python
-@mcp.tool(name="MyPC-my_tool")
-def my_tool(param: str) -> str:
-    """工具描述。"""
-    # 您的逻辑代码
-    return "结果"
+```
+MYPC-MCP/
+├── main.py                   # 服务器入口
+├── config.example.json       # 配置模板
+├── config.json              # 配置文件（gitignored）
+├── requirements.txt          # Python 依赖
+├── start.bat               # 快速启动脚本
+├── install.bat             # 安装脚本
+├── stop.bat                # 停止服务脚本
+├── setup-firewall.bat      # 防火墙配置
+├── tools/                   # 工具模块
+│   ├── screen.py            # 屏幕和摄像头工具
+│   ├── system.py            # 系统控制工具
+│   ├── files.py             # 文件管理工具
+│   ├── window.py            # 窗口管理工具
+│   ├── search.py            # 文件搜索工具
+│   ├── ssh.py               # SSH 远程工具
+│   ├── bash.py              # Git Bash 工具
+│   ├── keyboard_mouse.py    # 键鼠自动化
+│   ├── detector.py          # 智能文件检测
+│   └── detect_active_file.py # 文件检测实现
+├── utils/                   # 工具模块
+│   └── config.py            # 配置加载器
+└── screenshots/             # 截图存储
 ```
 
 ---
 
-## 许可证
+## 🌐 网络访问
+
+### 本地访问
+
+```bash
+# 启动服务器
+python main.py
+
+# 本机访问
+http://localhost:9999
+```
+
+### 局域网访问
+
+1. 配置防火墙（以管理员身份运行 `setup-firewall.bat`）
+2. 编辑 `config.json`：
+   ```json
+   {
+       "server": {
+           "host": "0.0.0.0",
+           "domain": "你的局域网IP"
+       }
+   }
+   ```
+3. 从局域网访问：`http://你的局域网IP:9999`
+
+### 公网访问
+
+1. 配置路由器端口转发（外部 9999 → 你的电脑:9999）
+2. 以管理员身份运行 `setup-firewall.bat`
+3. 配置域名或使用公网 IP
+
+详细指南请参阅 [NETWORK.md](NETWORK.md)。
+
+---
+
+## 🤝 贡献
+
+欢迎贡献！随时提交 Pull Request。
+
+---
+
+## 📄 许可证
 
 MIT License
-
----
-
-## 贡献
-
-欢迎贡献！请随时提交 Pull Request。

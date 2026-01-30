@@ -1,7 +1,40 @@
+# MCP 核心框架
 mcp
+
+# 屏幕截图和图像处理
 mss
 Pillow
+opencv-python
+
+# Windows 系统控制
 pycaw
 comtypes
 psutil
-opencv-python
+pywin32
+
+# 键鼠模拟
+pyautogui
+
+# 剪贴板操作
+pyperclip
+
+# UI 自动化
+uiautomation
+
+# GPU 监控
+GPUtil
+
+# 文件操作
+send2trash
+
+# SSH 远程连接
+paramiko
+
+# HTTP 请求
+httpx
+
+# Office 文档支持（可选）
+python-docx
+openpyxl
+python-pptx
+PyPDF2

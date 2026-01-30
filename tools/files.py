@@ -251,7 +251,7 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
             return f"Error listing directory: {str(e)}"
 
     @mcp.tool(name="MyPC-read_file")
-    def read_file(path: str, max_lines: int = 500) -> str:
+    def read_file(path: str, start_line: int = None, end_line: int = None, max_lines: int = 500) -> str:
         """
         Read contents of a file. Supports Text, Word (.docx), Excel (.xlsx), PPT (.pptx), PDF.
         (READ - allowed anywhere)
@@ -260,7 +260,15 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
 
         Args:
             path: Absolute path to the file. Can be in workspace (D:\\ALICE\\file.txt).
-            max_lines: Maximum number of lines/blocks to read (default 500).
+            start_line: Starting line number (1-indexed, None = from beginning).
+            end_line: Ending line number (1-indexed, exclusive, None = read default max_lines lines).
+            max_lines: Default maximum lines when start_line/end_line not specified (default 500).
+
+        Examples:
+            - (None, None): Read first max_lines lines (default 500)
+            - (100, 200): Read lines 100-199
+            - (100, None): Read max_lines lines starting from line 100
+            - (None, 100): Read first 100 lines
 
         Returns:
             File contents as text.
@@ -273,27 +281,66 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
 
         ext = os.path.splitext(path)[1].lower()
 
-        # Route to appropriate handler
+        # Default: read first max_lines lines
+        default_max_lines = max_lines
+
+        # Calculate actual line range
+        if start_line is None and end_line is None:
+            # Default: first max_lines lines
+            read_start = 0
+            read_end = default_max_lines
+            range_info = f"Lines 1-{default_max_lines}"
+        elif start_line is None and end_line is not None:
+            # From beginning to end_line
+            read_start = 0
+            read_end = end_line
+            range_info = f"Lines 1-{end_line}"
+        elif start_line is not None and end_line is None:
+            # From start_line for max_lines lines
+            read_start = start_line - 1  # Convert to 0-indexed
+            read_end = start_line - 1 + default_max_lines
+            range_info = f"Lines {start_line}-{start_line + default_max_lines - 1}"
+        else:
+            # From start_line to end_line
+            read_start = start_line - 1  # Convert to 0-indexed
+            read_end = end_line
+            range_info = f"Lines {start_line}-{end_line - 1}"
+
+        # Route to appropriate handler (Office files don't support range reading)
         if ext == ".docx":
-            return _read_docx(path, max_lines)
+            return _read_docx(path, read_end)
         elif ext == ".xlsx":
-            return _read_xlsx(path, max_lines)
+            return _read_xlsx(path, read_end)
         elif ext == ".pptx":
-            return _read_pptx(path, max_lines)
+            return _read_pptx(path, read_end)
         elif ext == ".pdf":
-            return _read_pdf(path, max_lines)
+            return _read_pdf(path, read_end)
 
         # Default text reading for other files
         try:
             with open(path, 'r', encoding='utf-8', errors='replace') as f:
                 lines = []
-                for i, line in enumerate(f):
-                    if i >= max_lines:
-                        lines.append(f"\n... (truncated at {max_lines} lines)")
+
+                # Skip to start line
+                if read_start > 0:
+                    for _ in range(read_start):
+                        try:
+                            next(f)
+                        except StopIteration:
+                            return f"Error: start_line {start_line} exceeds file length."
+
+                # Read lines from start to end
+                line_count = 0
+                for line in f:
+                    if line_count >= (read_end - read_start):
                         break
                     lines.append(line.rstrip('\n\r'))
+                    line_count += 1
 
-            return "\n".join(lines)
+                if line_count == 0:
+                    return f"Error: No lines found in specified range {range_info}."
+
+            return f"{range_info}:\n" + "\n".join(lines)
 
         except PermissionError:
             return f"Error: Permission denied to read: {path}"
@@ -439,40 +486,189 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
 
         except Exception as e:
             return f"Error editing file: {str(e)}"
-    def write_file(path: str, content: str) -> str:
-        """
-        Write content to a file. (WRITE - safe zones only)
 
-        Default workspace: D:\ALICE (recommended for new files)
+    @mcp.tool(name="MyPC-create")
+    def create(items) -> str:
+        """
+        Create files and/or directories. (WRITE - safe zones only)
+
+        IMPORTANT: This tool is for CREATING NEW FILES ONLY.
+        - Use 'edit_file' to modify existing files
+        - This tool will NOT modify existing files (fails if file exists)
+
+        Default workspace: D:\ALICE (recommended for new items)
         Safe zones: Documents, Downloads, Desktop, Pictures, D:\\, E:\\
 
-        Args:
-            path: Absolute path to the file (must be in a safe zone).
-                   Example: "D:\\ALICE\\notes.txt" or just "notes.txt" for workspace.
-            content: Text content to write.
+        ═══════════════════════════════════════════════════════════════
+        📦 支持的格式 | Supported Formats
+        ═══════════════════════════════════════════════════════════════
+
+        1️⃣ 简单字符串（自动判断类型）| Simple string (auto-detect):
+           - "folder"          → 创建目录 | Create directory
+           - "file.txt"        → 创建空文件 | Create empty file
+           - "D:\\path\\item"  → 使用绝对路径 | Use absolute path
+
+        2️⃣ 文件内容字典 | File content dict:
+           {"file.txt": "content", "config.json": '{"key": "value"}'}
+
+        3️⃣ 列表格式（混合）| List format (mixed):
+           [
+               "folder1",                           # 目录 | Directory
+               "folder2",
+               {"file.txt": "content"},             # 文件 | File
+               {"D:\\ALICE\\data.json": "{}"}       # 绝对路径文件 | Absolute path
+           ]
+
+        4️⃣ 详细格式（明确指定类型）| Detailed format (explicit type):
+           [
+               {"type": "dir", "path": "folder"},
+               {"type": "file", "path": "test.txt", "content": "hello"}
+           ]
+
+        ═══════════════════════════════════════════════════════════════
+        💡 示例 | Examples
+        ═══════════════════════════════════════════════════════════════
+
+        # 创建单个目录 | Create single directory
+        create("projects")
+
+        # 创建多个目录和文件 | Create multiple directories and files
+        create([
+            "src",
+            "docs",
+            {"README.md": "# My Project"},
+            {"config.json": '{"debug": true}'}
+        ])
+
+        # 详细格式 | Detailed format
+        create([
+            {"type": "dir", "path": "src"},
+            {"type": "file", "path": "index.js", "content": "console.log('hi')"}
+        ])
 
         Returns:
-            Success or error message.
+            Success or error message with details for each item.
         """
-        # If path is not absolute, use workspace
-        if not os.path.isabs(path):
-            path = os.path.join(DEFAULT_WORKSPACE, path)
+        # Normalize input to list of items
+        item_list = []
+        results = []
+        file_success = file_skip = file_fail = file_denied = 0
+        dir_success = dir_fail = dir_denied = 0
 
-        if not is_in_safe_zone(path):
-            return f"Error: Write operation denied. Path must be in a safe zone.\n\nSafe Zones:\n{get_safe_zones_str()}"
+        # Helper to process items recursively
+        def process_item(item):
+            nonlocal file_success, file_skip, file_fail, file_denied
+            nonlocal dir_success, dir_fail, dir_denied
 
-        try:
-            parent = os.path.dirname(path)
-            if parent and not os.path.exists(parent):
-                os.makedirs(parent, exist_ok=True)
+            # String: simple path (auto-detect type)
+            if isinstance(item, str):
+                # If no extension, treat as directory
+                if '.' not in os.path.basename(item) or item.endswith('/'):
+                    return {"type": "dir", "path": item}
+                else:
+                    return {"type": "file", "path": item, "content": ""}
 
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Dict with explicit type
+            elif isinstance(item, dict):
+                # Check if it's the detailed format
+                if "type" in item:
+                    return item
+                # Otherwise, it's a file content dict {"path": "content"}
+                else:
+                    items_list = []
+                    for path, content in item.items():
+                        items_list.append({"type": "file", "path": path, "content": content})
+                    return items_list
 
-            return f"File written successfully: {path}"
+            # List: process each element
+            elif isinstance(item, list):
+                items_list = []
+                for sub in item:
+                    processed = process_item(sub)
+                    if isinstance(processed, list):
+                        items_list.extend(processed)
+                    else:
+                        items_list.append(processed)
+                return items_list
 
-        except Exception as e:
-            return f"Error writing file: {str(e)}"
+            return None
+
+        # Process input
+        processed = process_item(items)
+        if isinstance(processed, list):
+            item_list = processed
+        elif processed:
+            item_list = [processed]
+
+        if not item_list:
+            return "Error: No valid items specified."
+
+        # Process each item
+        for item in item_list:
+            if not item or not isinstance(item, dict):
+                continue
+
+            item_type = item.get("type")
+            path = item.get("path", "")
+            content = item.get("content", "")
+
+            if not path:
+                results.append(f"[SKIP] Missing path")
+                continue
+
+            # If path is not absolute, use workspace
+            if not os.path.isabs(path):
+                path = os.path.join(DEFAULT_WORKSPACE, path)
+
+            # Check safe zone
+            if not is_in_safe_zone(path):
+                results.append(f"[DENIED] Not in safe zone: {path}")
+                if item_type == "file":
+                    file_denied += 1
+                else:
+                    dir_denied += 1
+                continue
+
+            # Create directory
+            if item_type == "dir":
+                try:
+                    os.makedirs(path, exist_ok=True)
+                    results.append(f"[OK] Directory created: {path}")
+                    dir_success += 1
+                except Exception as e:
+                    results.append(f"[FAIL] Directory {path}: {str(e)}")
+                    dir_fail += 1
+
+            # Create file
+            elif item_type == "file":
+                # Check if file already exists
+                if os.path.exists(path):
+                    results.append(f"[SKIP] File already exists: {path} (Use 'edit_file' to modify)")
+                    file_skip += 1
+                    continue
+
+                try:
+                    # Create parent directory if needed
+                    parent = os.path.dirname(path)
+                    if parent and not os.path.exists(parent):
+                        os.makedirs(parent, exist_ok=True)
+
+                    # Write file
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+
+                    results.append(f"[OK] File created: {os.path.basename(path)} -> {path}")
+                    file_success += 1
+
+                except Exception as e:
+                    results.append(f"[FAIL] File {os.path.basename(path)}: {str(e)}")
+                    file_fail += 1
+
+        # Summary
+        file_summary = f"Files: {file_success} created, {file_skip} skipped, {file_fail} failed, {file_denied} denied"
+        dir_summary = f"Directories: {dir_success} created, {dir_fail} failed, {dir_denied} denied"
+        summary = f"\n✨ Create complete:\n   {file_summary}\n   {dir_summary}"
+        return "\n".join(results) + summary
 
     @mcp.tool(name="MyPC-move_file")
     def move_file(source: str, destination: str) -> str:
@@ -503,81 +699,113 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
             return f"Error moving file: {str(e)}"
 
     @mcp.tool(name="MyPC-delete_file")
-    def delete_file(path: str, to_recycle: bool = True) -> str:
+    def delete_file(path, to_recycle: bool = True) -> str:
         """
-        Delete a file or directory. (WRITE - safe zones only)
+        Delete file(s) or directory/directories. (WRITE - safe zones only)
+
+        Supports both single and multiple paths:
+        - Single: path="D:\\ALICE\\file.txt"
+        - Multiple: path=["D:\\ALICE\\file1.txt", "D:\\ALICE\\file2.txt"]
 
         Args:
-            path: Path to delete (must be in safe zone).
+            path: Path (string) or list of paths to delete (all must be in safe zones).
             to_recycle: If True, move to recycle bin. If False, permanently delete.
 
         Returns:
             Success or error message.
         """
-        if not is_in_safe_zone(path):
-            return f"Error: Delete operation denied. Path must be in a safe zone.\n\nSafe Zones:\n{get_safe_zones_str()}"
+        # Handle single path (string)
+        if isinstance(path, str):
+            if not is_in_safe_zone(path):
+                return f"Error: Delete operation denied. Path must be in a safe zone.\n\nSafe Zones:\n{get_safe_zones_str()}"
 
-        if not os.path.exists(path):
-            return f"Error: Path does not exist: {path}"
+            if not os.path.exists(path):
+                return f"Error: Path does not exist: {path}"
 
-        try:
-            if to_recycle:
-                try:
-                    from send2trash import send2trash
-                    send2trash(path)
-                    return f"Moved to Recycle Bin: {path}"
-                except ImportError:
-                    return "Error: send2trash not installed. Use to_recycle=False for permanent deletion."
-            else:
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
+            try:
+                if to_recycle:
+                    try:
+                        from send2trash import send2trash
+                        send2trash(path)
+                        return f"Moved to Recycle Bin: {path}"
+                    except ImportError:
+                        return "Error: send2trash not installed. Use to_recycle=False for permanent deletion."
                 else:
-                    os.remove(path)
-                return f"Permanently deleted: {path}"
+                    if os.path.isdir(path):
+                        shutil.rmtree(path)
+                    else:
+                        os.remove(path)
+                    return f"Permanently deleted: {path}"
 
-        except Exception as e:
-            return f"Error deleting: {str(e)}"
+            except Exception as e:
+                return f"Error deleting: {str(e)}"
 
-    @mcp.tool(name="MyPC-create_directory")
-    def create_directory(path: str) -> str:
-        """
-        Create a new directory. (WRITE - safe zones only)
+        # Handle multiple paths (list)
+        elif isinstance(path, list):
+            if not path:
+                return "Error: Path list is empty"
 
-        Default workspace: D:\ALICE (recommended for new folders)
+            results = []
+            success_count = 0
+            fail_count = 0
+            denied_count = 0
 
-        Args:
-            path: Path for the new directory (must be in a safe zone).
-                   Example: "D:\\ALICE\\projects" or just "projects" for workspace.
+            for p in path:
+                # Check safe zone
+                if not is_in_safe_zone(p):
+                    results.append(f"[DENIED] Not in safe zone: {p}")
+                    denied_count += 1
+                    continue
 
-        Returns:
-            Success or error message.
-        """
-        # If path is not absolute, use workspace
-        if not os.path.isabs(path):
-            path = os.path.join(DEFAULT_WORKSPACE, path)
+                if not os.path.exists(p):
+                    results.append(f"[FAIL] Path does not exist: {p}")
+                    fail_count += 1
+                    continue
 
-        if not is_in_safe_zone(path):
-            return f"Error: Create directory denied. Path must be in a safe zone.\n\nSafe Zones:\n{get_safe_zones_str()}"
+                try:
+                    if to_recycle:
+                        try:
+                            from send2trash import send2trash
+                            send2trash(p)
+                            results.append(f"[OK] Moved to Recycle Bin: {os.path.basename(p)}")
+                            success_count += 1
+                        except ImportError:
+                            return "Error: send2trash not installed. Use to_recycle=False for permanent deletion."
+                    else:
+                        if os.path.isdir(p):
+                            shutil.rmtree(p)
+                        else:
+                            os.remove(p)
+                        results.append(f"[OK] Permanently deleted: {os.path.basename(p)}")
+                        success_count += 1
+                except Exception as e:
+                    results.append(f"[FAIL] {os.path.basename(p)}: {str(e)}")
+                    fail_count += 1
 
-        try:
-            os.makedirs(path, exist_ok=True)
-            return f"Directory created: {path}"
+            summary = f"\nBatch delete complete: {success_count} succeeded, {fail_count} failed, {denied_count} denied"
+            return "\n".join(results) + summary
 
-        except Exception as e:
-            return f"Error creating directory: {str(e)}"
+        else:
+            return "Error: Path must be a string or list of strings"
 
     # ==================== COPY OPERATION (Special: INTO safe zone only) ====================
 
     @mcp.tool(name="MyPC-copy_file")
-    def copy_file(source: str, destination: str) -> str:
+    def copy_file(source, destination: str) -> str:
         """
-        Copy a file or directory. (SPECIAL - destination must be in safe zone)
+        Copy file(s) or directory/directories. (SPECIAL - destination must be in safe zone)
 
         Security: You can copy FROM anywhere INTO a safe zone, but NOT out of safe zones.
 
+        Supports both single and multiple sources:
+        - Single: source="C:\\file.txt", destination="D:\\ALICE\\file.txt"
+        - Multiple: source=["C:\\file1.txt", "C:\\file2.txt"], destination="D:\\ALICE\\"
+          (copies all files to the destination directory)
+
         Args:
-            source: Source path (can be anywhere).
-            destination: Destination path (must be in a safe zone).
+            source: Source path (string) or list of source paths.
+            destination: Destination path. For single source can be file or directory.
+                        For multiple sources must be a directory (must be in a safe zone).
 
         Returns:
             Success or error message.
@@ -585,20 +813,146 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
         if not is_in_safe_zone(destination):
             return f"Error: Copy destination must be in a safe zone.\nDestination: {destination}\n\nSafe Zones:\n{get_safe_zones_str()}"
 
-        if not os.path.exists(source):
-            return f"Error: Source does not exist: {source}"
+        # Handle single source (string)
+        if isinstance(source, str):
+            if not os.path.exists(source):
+                return f"Error: Source does not exist: {source}"
 
-        try:
-            if os.path.isdir(source):
-                shutil.copytree(source, destination)
-            else:
+            try:
                 # Ensure parent directory exists
                 parent = os.path.dirname(destination)
                 if parent and not os.path.exists(parent):
                     os.makedirs(parent, exist_ok=True)
-                shutil.copy2(source, destination)
 
-            return f"Copied: {source} -> {destination}"
+                if os.path.isdir(source):
+                    shutil.copytree(source, destination)
+                else:
+                    shutil.copy2(source, destination)
 
+                return f"Copied: {source} -> {destination}"
+
+            except Exception as e:
+                return f"Error copying: {str(e)}"
+
+        # Handle multiple sources (list)
+        elif isinstance(source, list):
+            if not source:
+                return "Error: Source list is empty"
+
+            # Create destination directory if it doesn't exist
+            if not os.path.exists(destination):
+                try:
+                    os.makedirs(destination, exist_ok=True)
+                except Exception as e:
+                    return f"Error creating destination directory: {str(e)}"
+
+            results = []
+            success_count = 0
+            fail_count = 0
+
+            for src in source:
+                if not os.path.exists(src):
+                    results.append(f"[FAIL] Source does not exist: {src}")
+                    fail_count += 1
+                    continue
+
+                try:
+                    # Determine destination path
+                    dest_path = os.path.join(destination, os.path.basename(src))
+
+                    if os.path.isdir(src):
+                        shutil.copytree(src, dest_path)
+                    else:
+                        shutil.copy2(src, dest_path)
+
+                    results.append(f"[OK] {os.path.basename(src)}")
+                    success_count += 1
+                except Exception as e:
+                    results.append(f"[FAIL] {os.path.basename(src)}: {str(e)}")
+                    fail_count += 1
+
+            summary = f"\nBatch copy complete: {success_count} succeeded, {fail_count} failed"
+            return "\n".join(results) + summary
+
+    # ==================== SEARCH OPERATIONS (Anywhere) ====================
+
+    @mcp.tool(name="MyPC-grep_files")
+    def grep_files(path: str, keyword: str, recursive: bool = True, extensions: list = None, case_sensitive: bool = False, max_results: int = 100) -> str:
+        """
+        在指定目录或文件搜索包含特定关键词的内容。 (READ - allowed anywhere)
+
+        Search for keyword content in specified directory or file.
+
+        Args:
+            path: 文件或文件夹的绝对路径 | Absolute path to file or folder
+            keyword: 要搜索的关键词 | Keyword to search for
+            recursive: 如果是文件夹，是否递归搜索子文件夹 | Recursively search subfolders (default True)
+            extensions: 限制搜索的文件后缀 | Limit file extensions, e.g. [".txt", ".py"] (default None)
+            case_sensitive: 是否区分大小写 | Case sensitive search (default False)
+            max_results: 最大返回结果数 | Maximum results to return (default 100)
+
+        Returns:
+            搜索结果，包含文件名、行号和匹配行内容 | Search results with filename, line number, and matched content.
+        """
+        if not os.path.exists(path):
+            return f"Error: Path does not exist: {path}"
+
+        import re
+
+        # Prepare search pattern
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            pattern = re.compile(keyword, flags)
         except Exception as e:
-            return f"Error copying: {str(e)}"
+            return f"Error: Invalid search pattern/keyword: {str(e)}"
+
+        results = []
+        files_to_scan = []
+
+        # 1. Collect files to scan
+        if os.path.isfile(path):
+            files_to_scan.append(path)
+        else:
+            if recursive:
+                for root, _, files in os.walk(path):
+                    for name in files:
+                        files_to_scan.append(os.path.join(root, name))
+            else:
+                for name in os.listdir(path):
+                    full_p = os.path.join(path, name)
+                    if os.path.isfile(full_p):
+                        files_to_scan.append(full_p)
+
+        # 2. Filter by extensions if provided
+        if extensions:
+            # Normalize extensions to start with dot
+            exts = [e if e.startswith('.') else '.' + e for e in extensions]
+            files_to_scan = [f for f in files_to_scan if os.path.splitext(f)[1].lower() in exts]
+
+        # 3. Perform search
+        match_count = 0
+        for file_path in files_to_scan:
+            if match_count >= max_results:
+                break
+
+            try:
+                # Try reading as text
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    for line_num, line in enumerate(f, 1):
+                        if pattern.search(line):
+                            match_count += 1
+                            clean_line = line.strip()
+                            rel_path = os.path.relpath(file_path, path) if os.path.isdir(path) else os.path.basename(file_path)
+                            results.append(f"[{rel_path}:{line_num}] {clean_line}")
+
+                            if match_count >= max_results:
+                                results.append(f"\n... (truncated at {max_results} results)")
+                                break
+            except Exception:
+                # Skip files that can't be read (binary, permissions, etc.)
+                continue
+
+        if not results:
+            return f"No matches found for '{keyword}' in {path}."
+
+        return f"Found {match_count} matches in {path}:\n\n" + "\n".join(results)

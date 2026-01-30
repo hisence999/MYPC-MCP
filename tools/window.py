@@ -708,3 +708,294 @@ def register_window_tools(mcp: FastMCP, screenshots_dir: str, base_url: str):
 
         except Exception as e:
             return f"Error getting hardware status: {str(e)}"
+
+    # ==================== BROWSER & CONTROL FEATURES ====================
+
+    @mcp.tool(name="MyPC-get_browser_url")
+    def get_browser_url(timeout: int = 3) -> str:
+        """
+        Get URL from the active browser window (Chrome/Edge/Firefox).
+
+        Args:
+            timeout: Maximum seconds to wait for address bar (default 3)
+
+        Returns:
+            JSON with status, url, title, and timing info.
+        """
+        import json
+        import time
+
+        start_time = time.time()
+
+        try:
+            import uiautomation as auto
+
+            # 1. Get the foreground window
+            window = auto.GetForegroundControl()
+
+            # 2. Find address bar using RegexName pattern
+            address_bar = window.EditControl(
+                RegexName=".*(Address|地址|搜索|Search|URL|url).*",
+                searchDepth=10
+            )
+
+            # 3. Check if found within timeout
+            if not address_bar.Exists(maxSearchSeconds=timeout):
+                end_time = time.time()
+                return json.dumps({
+                    "status": "error",
+                    "msg": f"Address bar not found within {timeout}s",
+                    "cost": f"{end_time - start_time:.4f}s"
+                }, ensure_ascii=False)
+
+            # 4. Get URL using ValuePattern
+            url = address_bar.GetValuePattern().Value
+
+            # 5. Clean URL (browsers sometimes hide https://)
+            if url and not url.startswith('http'):
+                url = 'https://' + url
+
+            end_time = time.time()
+            return json.dumps({
+                "status": "success",
+                "url": url,
+                "title": window.Name,
+                "cost": f"{end_time - start_time:.4f}s"
+            }, ensure_ascii=False)
+
+        except Exception as e:
+            end_time = time.time()
+            return json.dumps({
+                "status": "error",
+                "msg": str(e),
+                "cost": f"{end_time - start_time:.4f}s"
+            }, ensure_ascii=False)
+
+    @mcp.tool(name="MyPC-get_focused_control")
+    def get_focused_control() -> str:
+        """
+        Get currently focused UI control info including its text content.
+        Returns name, class, type, and the text/value in the control (if available).
+        """
+        try:
+            import uiautomation as auto
+            control = auto.GetFocusedControl()
+
+            info = [
+                f"Name: {control.Name}",
+                f"Class: {control.ClassName}",
+                f"Type: {control.ControlTypeName}"
+            ]
+
+            # Try to get text/value content
+            text_content = None
+
+            # Try ValuePattern first
+            try:
+                value_pattern = control.GetValuePattern()
+                if value_pattern:
+                    text_content = value_pattern.Value
+            except:
+                pass
+
+            # Fallback to LegacyIAccessiblePattern
+            if not text_content:
+                try:
+                    legacy_pattern = control.GetLegacyIAccessiblePattern()
+                    if legacy_pattern:
+                        text_content = legacy_pattern.Value
+                except:
+                    pass
+
+            # Add text content if found
+            if text_content and text_content.strip():
+                info.append(f"Text/Value: {text_content}")
+
+            return "\n".join(info)
+
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    @mcp.tool(name="MyPC-focus_window")
+    def focus_window(title: str = None, process_name: str = None) -> str:
+        """
+        Focus/bring to front a window by title or process name.
+        If multiple windows match, brings the first one to front.
+        """
+        try:
+            import win32con
+            target_hwnd = None
+            matches = []
+
+            def callback(hwnd, result):
+                if win32gui.IsWindowVisible(hwnd):
+                    window_title = win32gui.GetWindowText(hwnd)
+                    if window_title:
+                        if title and title.lower() in window_title.lower():
+                            result.append((hwnd, window_title, "title"))
+                        elif process_name:
+                            try:
+                                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                                process = psutil.Process(pid)
+                                if process_name.lower() in process.name().lower():
+                                    result.append((hwnd, window_title, "process"))
+                            except:
+                                pass
+
+            win32gui.EnumWindows(callback, matches)
+
+            if not matches:
+                return f"No matching window found. title={title}, process={process_name}"
+
+            # Bring the first match to front
+            target_hwnd, window_title, match_type = matches[0]
+
+            # Restore if minimized
+            if win32gui.IsIconic(target_hwnd):
+                win32gui.ShowWindow(target_hwnd, win32con.SW_RESTORE)
+
+            # Bring to front
+            win32gui.SetForegroundWindow(target_hwnd)
+
+            return f"Focused window: [{window_title}] (matched by {match_type})"
+
+        except Exception as e:
+            return f"Error focusing window: {str(e)}"
+
+    @mcp.tool(name="MyPC-minimize_window")
+    def minimize_window(title: str = None, process_name: str = None) -> str:
+        """Minimize a window by title or process name."""
+        try:
+            import win32con
+            matches = []
+
+            def callback(hwnd, result):
+                if win32gui.IsWindowVisible(hwnd):
+                    window_title = win32gui.GetWindowText(hwnd)
+                    if window_title:
+                        if title and title.lower() in window_title.lower():
+                            result.append((hwnd, window_title))
+                        elif process_name:
+                            try:
+                                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                                process = psutil.Process(pid)
+                                if process_name.lower() in process.name().lower():
+                                    result.append((hwnd, window_title))
+                            except:
+                                pass
+
+            win32gui.EnumWindows(callback, matches)
+
+            if not matches:
+                return f"No matching window found."
+
+            count = 0
+            for hwnd, window_title in matches:
+                win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+                count += 1
+
+            return f"Minimized {count} window(s)."
+
+        except Exception as e:
+            return f"Error minimizing window: {str(e)}"
+
+    @mcp.tool(name="MyPC-maximize_window")
+    def maximize_window(title: str = None, process_name: str = None) -> str:
+        """Maximize a window by title or process name."""
+        try:
+            import win32con
+            matches = []
+
+            def callback(hwnd, result):
+                if win32gui.IsWindowVisible(hwnd):
+                    window_title = win32gui.GetWindowText(hwnd)
+                    if window_title:
+                        if title and title.lower() in window_title.lower():
+                            result.append((hwnd, window_title))
+                        elif process_name:
+                            try:
+                                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                                process = psutil.Process(pid)
+                                if process_name.lower() in process.name().lower():
+                                    result.append((hwnd, window_title))
+                            except:
+                                pass
+
+            win32gui.EnumWindows(callback, matches)
+
+            if not matches:
+                return f"No matching window found."
+
+            hwnd, window_title = matches[0]
+            win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
+            return f"Maximized window: [{window_title}]"
+
+        except Exception as e:
+            return f"Error maximizing window: {str(e)}"
+
+    @mcp.tool(name="MyPC-close_window")
+    def close_window(title: str = None, process_name: str = None) -> str:
+        """Close a window by title or process name."""
+        try:
+            matches = []
+
+            def callback(hwnd, result):
+                if win32gui.IsWindowVisible(hwnd):
+                    window_title = win32gui.GetWindowText(hwnd)
+                    if window_title:
+                        if title and title.lower() in window_title.lower():
+                            result.append((hwnd, window_title))
+                        elif process_name:
+                            try:
+                                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                                process = psutil.Process(pid)
+                                if process_name.lower() in process.name().lower():
+                                    result.append((hwnd, window_title))
+                            except:
+                                pass
+
+            win32gui.EnumWindows(callback, matches)
+
+            if not matches:
+                return f"No matching window found."
+
+            count = 0
+            for hwnd, window_title in matches:
+                win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
+                count += 1
+
+            return f"Closed {count} window(s)."
+
+        except Exception as e:
+            return f"Error closing window: {str(e)}"
+
+    @mcp.tool(name="MyPC-delay")
+    def delay(seconds: int = 5, message: str = None) -> str:
+        """
+        Block and wait for specified seconds before returning.
+
+        Args:
+            seconds: Wait time in seconds (1-120, default 5)
+            message: Optional message to display while waiting
+
+        Returns:
+            Confirmation message after delay completes.
+        """
+        import time
+
+        # Validate timeout
+        if seconds < 1:
+            return "Error: Minimum delay is 1 second."
+        if seconds > 120:
+            return "Error: Maximum delay is 120 seconds."
+
+        start_time = time.time()
+
+        # Block for specified seconds
+        time.sleep(seconds)
+
+        elapsed = time.time() - start_time
+
+        if message:
+            return f"Delay complete: {message} (waited {elapsed:.1f}s)"
+        return f"Delay complete: waited {elapsed:.1f}s"
