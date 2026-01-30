@@ -37,7 +37,8 @@
     ],
 
     "paths": {
-        "workspace": "D:\\ALICE",
+        "_comment": "工作区和其他路径配置",
+        "workspace": "%USERPROFILE%\\Workspace",
         "everything": [
             "C:\\Program Files\\Everything\\es.exe",
             "C:\\Program Files (x86)\\Everything\\es.exe",

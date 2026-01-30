@@ -258,54 +258,6 @@ def register_window_tools(mcp: FastMCP, screenshots_dir: str, base_url: str):
         except Exception as e:
             return f"Error listing windows: {str(e)}"
 
-    @mcp.tool(name="MyPC-get_explorer_path")
-    def get_explorer_path() -> str:
-        """
-        Get the current path of active File Explorer windows.
-
-        Returns:
-            List of Explorer windows with their current paths.
-        """
-        try:
-            shell = win32com.client.Dispatch("Shell.Application")
-            explorers = []
-
-            # Get all explorer windows
-            for window in shell.Windows():
-                try:
-                    # Get the full path of the window
-                    location = window.LocationURL
-                    hwnd = window.HWND
-
-                    # Check if window is visible
-                    if win32gui.IsWindowVisible(hwnd):
-                        # Get window title
-                        title = win32gui.GetWindowText(hwnd)
-
-                        # Convert file:/// URL to path
-                        if location.startswith("file:///"):
-                            path = location[8:].replace("/", "\\")
-                            # URL decode
-                            import urllib.parse
-                            path = urllib.parse.unquote(path)
-                        elif location.startswith("::"):  # Virtual folder (This PC, etc.)
-                            path = window.LocationName  # Use friendly name
-                        else:
-                            path = location
-
-                        explorers.append(f"[{title}] {path}")
-                except Exception as e:
-                    # Skip windows that can't be accessed
-                    continue
-
-            if explorers:
-                return "\n".join(explorers)
-            else:
-                return "No File Explorer windows found."
-
-        except Exception as e:
-            return f"Error getting explorer path: {str(e)}"
-
     @mcp.tool(name="MyPC-kill_process")
     def kill_process(process_name: str = None, pid: int = None) -> str:
         """
@@ -512,7 +464,12 @@ def register_window_tools(mcp: FastMCP, screenshots_dir: str, base_url: str):
             # Window Procedure
             WNDPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
             def DefWindowProc(hwnd, msg, wparam, lparam):
-                return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+                return ctypes.windll.user32.DefWindowProcW(
+                    wintypes.HWND(hwnd),
+                    wintypes.UINT(msg),
+                    wintypes.WPARAM(wparam),
+                    wintypes.LPARAM(lparam)
+                )
 
             class WNDCLASSW(ctypes.Structure):
                 _fields_ = [

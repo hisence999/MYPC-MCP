@@ -24,8 +24,8 @@ try:
 except ImportError:
     PyPDF2 = None
 
-# Default workspace directory
-DEFAULT_WORKSPACE = "D:\\ALICE"
+# Default workspace directory (will be overridden by config)
+DEFAULT_WORKSPACE = "D:\\ALICE"  # Fallback, will be replaced by config
 
 # Default safe zones - can be configured
 DEFAULT_SAFE_ZONES = [
@@ -35,7 +35,7 @@ DEFAULT_SAFE_ZONES = [
 ]
 
 
-def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: str = ""):
+def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: str = "", default_workspace: str = None):
     """
     Register file management tools with tiered permissions.
 
@@ -48,10 +48,17 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
         mcp: FastMCP instance
         safe_zones: List of directories where write operations are allowed.
         base_url: Base URL of the server (e.g., "http://localhost:9999")
+        default_workspace: Default workspace directory for file operations
     """
+    global DEFAULT_WORKSPACE
+
     allowed_zones = safe_zones or DEFAULT_SAFE_ZONES
     # Normalize paths
     allowed_zones = [os.path.abspath(z) for z in allowed_zones]
+
+    # Use configured workspace if provided
+    if default_workspace:
+        DEFAULT_WORKSPACE = default_workspace
 
     # Ensure workspace exists
     os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)

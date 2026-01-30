@@ -38,3 +38,10 @@ python-docx
 openpyxl
 python-pptx
 PyPDF2
+
+# Excel 自动化
+xlwings
+
+# 数据处理（Excel 工具可选依赖）
+pandas
+numpy

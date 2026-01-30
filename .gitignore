@@ -27,3 +27,4 @@ create_test_files.py
 # OS
 .DS_Store
 Thumbs.db
+.claude/

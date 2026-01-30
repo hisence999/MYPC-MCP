@@ -17,6 +17,8 @@ A powerful Model Context Protocol (MCP) server that provides AI agents with comp
 - **🔍 File Search**: Fast search using Everything integration
 - **⌨️ Keyboard & Mouse**: Text input and hotkey automation
 - **🧠 Smart Detection**: Auto-detect active window's file path
+- **📊 Excel Automation**: Control open Excel workbooks via xlwings
+- **📝 Office Automation**: Control Word and PowerPoint via pywin32
 - **🌐 SSH Remote**: Execute commands on remote Linux servers
 - **📊 System Control**: Volume, power, notifications, hardware status
 - **📋 Clipboard**: Read and write clipboard content
@@ -135,6 +137,14 @@ Run `setup-firewall.bat` as Administrator to allow port 9999.
 ### File Search & Detection
 - `MyPC-search_files` - Fast file search via Everything
 - `MyPC-detect_active_file` - Smart detection of active window's file
+
+### Excel Automation
+- `MyPC-execute_excel_code` - Execute xlwings code in active Excel
+- `MyPC-list_excel_books` - List all open Excel workbooks
+
+### Office Automation
+- `MyPC-execute_word_code` - Execute pywin32 code in active Word
+- `MyPC-execute_ppt_code` - Execute pywin32 code in active PowerPoint
 
 ### Input Automation
 - `type_text` - Type text (supports Chinese via clipboard)
@@ -360,7 +370,9 @@ MYPC-MCP/
 │   ├── bash.py              # Git Bash tools
 │   ├── keyboard_mouse.py    # Keyboard & mouse automation
 │   ├── detector.py          # Smart file detection
-│   └── detect_active_file.py # File detection implementation
+│   ├── detect_active_file.py # File detection implementation
+│   ├── excel.py             # Excel automation (xlwings)
+│   └── office.py            # Office automation (Word/PPT)
 ├── utils/                   # Utility modules
 │   └── config.py            # Configuration loader
 └── screenshots/             # Screenshot storage
@@ -429,6 +441,8 @@ MIT License
 - **🔍 文件搜索**：通过 Everything 集成实现快速文件搜索
 - **⌨️ 键鼠自动化**：文本输入和快捷键自动化
 - **🧠 智能检测**：自动检测活动窗口关联的文件路径
+- **📊 Excel 自动化**：通过 xlwings 控制已打开的 Excel 工作簿
+- **📝 Office 自动化**：通过 pywin32 控制 Word 和 PowerPoint
 - **🌐 SSH 远程**：在远程 Linux 服务器上执行命令
 - **📊 系统控制**：音量、电源、通知、硬件状态
 - **📋 剪贴板**：读取和写入剪贴板内容
@@ -547,6 +561,14 @@ python main.py
 ### 文件搜索与检测
 - `MyPC-search_files` - 通过 Everything 快速搜索文件
 - `MyPC-detect_active_file` - 智能检测活动窗口的文件
+
+### Excel 自动化
+- `MyPC-execute_excel_code` - 在已打开的 Excel 中执行 xlwings 代码
+- `MyPC-list_excel_books` - 列出所有打开的 Excel 工作簿
+
+### Office 自动化
+- `MyPC-execute_word_code` - 在已打开的 Word 中执行 pywin32 代码
+- `MyPC-execute_ppt_code` - 在已打开的 PowerPoint 中执行 pywin32 代码
 
 ### 输入自动化
 - `type_text` - 输入文本（支持通过剪贴板输入中文）
@@ -772,7 +794,9 @@ MYPC-MCP/
 │   ├── bash.py              # Git Bash 工具
 │   ├── keyboard_mouse.py    # 键鼠自动化
 │   ├── detector.py          # 智能文件检测
-│   └── detect_active_file.py # 文件检测实现
+│   ├── detect_active_file.py # 文件检测实现
+│   ├── excel.py             # Excel 自动化 (xlwings)
+│   └── office.py            # Office 自动化 (Word/PPT)
 ├── utils/                   # 工具模块
 │   └── config.py            # 配置加载器
 └── screenshots/             # 截图存储

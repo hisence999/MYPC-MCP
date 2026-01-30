@@ -15,6 +15,7 @@ from utils.config import (
     get_config_value,
     get_safe_zones,
     get_drives,
+    get_workspace,
 )
 
 # 导入工具模块
@@ -29,6 +30,8 @@ from tools.search import register_search_tools
 from tools.bash import register_bash_tools
 from tools.keyboard_mouse import register_keyboard_mouse_tools
 from tools.detector import register_detector_tools
+from tools.excel import register_excel_tools
+from tools.office import register_office_tools
 
 # Starlette 组件
 from starlette.staticfiles import StaticFiles
@@ -87,6 +90,9 @@ SAFE_ZONES = get_safe_zones(config)
 
 # SSH 配置
 SSH_CONFIG = config.get("ssh", None)
+
+# 工作区配置
+DEFAULT_WORKSPACE = get_workspace(config)
 
 # 网络配置
 LOCAL_IP = get_local_ip()
@@ -152,7 +158,7 @@ register_system_tools(mcp)
 
 # 文件工具
 print("  - File tools (read, write, search)")
-register_file_tools(mcp, safe_zones=SAFE_ZONES, base_url=BASE_URL)
+register_file_tools(mcp, safe_zones=SAFE_ZONES, base_url=BASE_URL, default_workspace=DEFAULT_WORKSPACE)
 
 # 窗口工具
 print("  - Window tools (process, clipboard, notification)")
@@ -173,6 +179,14 @@ register_keyboard_mouse_tools(mcp)
 # 文件检测工具
 print("  - File detector tools")
 register_detector_tools(mcp)
+
+# Excel 工具
+print("  - Excel tools")
+register_excel_tools(mcp)
+
+# Office 工具
+print("  - Office tools")
+register_office_tools(mcp)
 
 # SSH 工具
 if SSH_CONFIG:

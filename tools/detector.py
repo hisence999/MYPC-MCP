@@ -11,6 +11,7 @@ File Detection Tools - 文件检测工具模块
 5. 在任何需要获取活动窗口关联文件路径的场景
 
 支持的应用类型：
+- 资源管理器：自动检测选中文件和当前路径
 - 文本编辑器：记事本、VS Code、Notepad++、Sublime Text
 - 办公软件：Word、Excel、PowerPoint
 - 压缩软件：Bandizip、WinRAR、7-Zip
@@ -18,11 +19,14 @@ File Detection Tools - 文件检测工具模块
 - 其他：任何在窗口标题中显示文件路径的软件
 
 检测策略（按优先级）：
+0. 资源管理器特殊处理 - 检测资源管理器选中项和当前路径
 A. 标题路径提取 - 从窗口标题中直接提取完整路径
 B. 软件特征库 - 根据软件特征模式匹配提取路径
 C. 进程句柄查询 - 通过进程打开的文件句柄查找
-D. 当前目录搜索 - 在项目目录和用户目录中递归搜索
+D. 当前目录搜索 - 在项目目录和用户目录中递归搜索（3层深度）
 E. Everything 搜索 - 系统级文件搜索（需要 Everything 服务）
+
+Author: MyPC-MCP
 """
 
 from mcp.server.fastmcp import FastMCP
@@ -63,6 +67,7 @@ def register_detector_tools(mcp: FastMCP):
         📋 支持的应用
         ═══════════════════════════════════════════════════════════════
 
+        • 资源管理器：自动检测选中的文件或当前路径（支持多选提示）
         • 文本编辑器：记事本、VS Code、Notepad++、Sublime Text、PyCharm
         • 办公软件：Word、Excel、PowerPoint
         • 压缩软件：Bandizip、WinRAR、7-Zip、WinZip
@@ -86,6 +91,19 @@ def register_detector_tools(mcp: FastMCP):
             "preview": "文本预览（如果是文本文件）"
         }
 
+        资源管理器特殊返回：
+        {
+            "type": "directory",  // 或文件的标准返回
+            "path": "路径",
+            "software": "explorer.exe",
+            "strategy": "资源管理器选中项" 或 "资源管理器当前路径",
+            "explorer_info": {
+                "current_path": "当前浏览路径",
+                "selected_files": ["选中的文件1", "选中的文件2", ...]
+            },
+            "note": "共选中 N 个文件，返回第一个"  // 仅多选时有此字段
+        }
+
         失败时返回：
         {
             "error": "错误信息",
@@ -98,14 +116,16 @@ def register_detector_tools(mcp: FastMCP):
         💡 提示
         ═══════════════════════════════════════════════════════════════
 
-        此工具使用 5 种策略按优先级检测文件：
+        此工具使用 6 种策略按优先级检测文件：
+        • 策略 Explorer：资源管理器特殊处理（自动检测选中文件）
         • 策略 A：标题路径提取（最快）
         • 策略 B：软件特征库匹配
         • 策略 C：进程句柄查询
-        • 策略 D：当前目录递归搜索（可配置深度）
+        • 策略 D：当前目录递归搜索（3层深度）
         • 策略 E：Everything 系统级搜索（终极后备）
 
         即使文件藏在极深的目录下，也能通过 Everything 搜索找到。
+        对于资源管理器，会自动返回选中的文件；如果选中多个，返回第一个并提示。
         """
         import json
         result = detect_active_file()

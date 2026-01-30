@@ -199,3 +199,22 @@ def get_drives(config: Dict[str, Any]) -> List[str]:
                 drives.append(drive)
 
     return drives
+
+
+def get_workspace(config: Dict[str, Any]) -> str:
+    """
+    获取工作区目录
+
+    Args:
+        config: 配置字典
+
+    Returns:
+        工作区路径，默认为用户目录下的 Workspace
+    """
+    workspace = config.get("paths", {}).get("workspace") or config.get("files", {}).get("default_workspace")
+
+    if workspace:
+        return expand_env_vars(workspace)
+
+    # 默认工作区
+    return os.path.expanduser("~/Workspace")
