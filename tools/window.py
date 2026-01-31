@@ -405,135 +405,187 @@ def register_window_tools(mcp: FastMCP, screenshots_dir: str, base_url: str):
     # ==================== NEW FEATURES ====================
 
     @mcp.tool(name="MyPC-show_notification")
-    def show_notification(title: str, message: str, duration: int = 5, app_name: str = "MyPC") -> str:
+    def show_notification(title: str, message: str, duration: int = 60, app_name: str = "MyPC", style: str = "modern", buttons: list = None, theme: str = "light", x: int = -1, y: int = -1) -> str:
         """
-        Send a Windows Toast notification with a custom app name.
-        Uses raw Windows API via ctypes for maximum compatibility and customization.
+        Windows Notification with Win11 Style Support.
+
+        Args:
+            title: Title of notification (supports emoji)
+            message: Message body (supports emoji)
+            duration: Timeout in seconds (default 60)
+            app_name: App name for modern style
+            style: 'modern' or 'choice'
+            buttons: List of button labels for 'choice' style (max 3 buttons)
+            theme: 'light' or 'dark'
+            x: X coordinate (for 'choice' style, -1 for default right-bottom)
+            y: Y coordinate (for 'choice' style, -1 for default right-bottom)
         """
-        try:
-            import win32con
-            import ctypes
-            from ctypes import wintypes
+        import subprocess, base64, win32gui, win32con, time
+        if style == "choice":
+            try:
+                if not buttons: buttons = ["确认"]
+                # Limit to max 3 buttons
+                if len(buttons) > 3:
+                    return "Error: Maximum 3 buttons allowed for choice notifications."
 
-            # Define NOTIFYICONDATAW struct manually
-            class GUID(ctypes.Structure):
-                _fields_ = [
-                    ("Data1", wintypes.DWORD),
-                    ("Data2", wintypes.WORD),
-                    ("Data3", wintypes.WORD),
-                    ("Data4", wintypes.BYTE * 8)
-                ]
+                # Use UTF-8 encoding for emoji support
+                def encode_text(t): return base64.b64encode(t.encode('utf-8')).decode('ascii')
 
-            class NOTIFYICONDATAW(ctypes.Structure):
-                _fields_ = [
-                    ("cbSize", wintypes.DWORD),
-                    ("hWnd", wintypes.HWND),
-                    ("uID", wintypes.UINT),
-                    ("uFlags", wintypes.UINT),
-                    ("uCallbackMessage", wintypes.UINT),
-                    ("hIcon", wintypes.HICON),
-                    ("szTip", wintypes.WCHAR * 128),
-                    ("dwState", wintypes.DWORD),
-                    ("dwStateMask", wintypes.DWORD),
-                    ("szInfo", wintypes.WCHAR * 256),
-                    ("uVersion", wintypes.UINT),
-                    ("szInfoTitle", wintypes.WCHAR * 64),
-                    ("dwInfoFlags", wintypes.DWORD),
-                    ("guidItem", GUID),
-                    ("hBalloonIcon", wintypes.HICON)
-                ]
+                b64_title, b64_msg = encode_text(title), encode_text(message)
 
-            # Constants
-            NIM_ADD = 0x00000000
-            NIM_DELETE = 0x00000002
-            NIF_MESSAGE = 0x00000001
-            NIF_ICON = 0x00000002
-            NIF_TIP = 0x00000004
-            NIF_INFO = 0x00000010
-            NIIF_INFO = 0x00000001
-            WM_USER = 0x0400
+                # Modern dimensions and colors
+                btn_w, btn_h, spacing = 110, 40, 12
+                win_w = 400
+                win_h = 200
 
-            # Load icon
-            # 32516 is IDI_INFORMATION
-            hIcon = ctypes.windll.user32.LoadIconW(None, 32516)
+                # Theme colors
+                if theme == "dark":
+                    bg = "32, 32, 32"
+                    text_primary = "255, 255, 255"
+                    text_secondary = "170, 170, 170"
+                    btn_bg = "0, 120, 215"
+                    btn_hover = "0, 140, 235"
+                    btn_text = "255, 255, 255"
+                    border = "60, 60, 60"
+                else:
+                    bg = "253, 253, 253"
+                    text_primary = "30, 30, 30"
+                    text_secondary = "100, 100, 100"
+                    btn_bg = "0, 120, 215"
+                    btn_hover = "0, 140, 235"
+                    btn_text = "255, 255, 255"
+                    border = "200, 200, 200"
 
-            # Create hidden window
-            hInstance = ctypes.windll.kernel32.GetModuleHandleW(None)
-            wndClassName = "MyPCToastClass"
+                btn_scripts = []
+                start_x = (win_w - (len(buttons)*btn_w + (len(buttons)-1)*spacing)) // 2
 
-            # Window Procedure
-            WNDPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
-            def DefWindowProc(hwnd, msg, wparam, lparam):
-                return ctypes.windll.user32.DefWindowProcW(
-                    wintypes.HWND(hwnd),
-                    wintypes.UINT(msg),
-                    wintypes.WPARAM(wparam),
-                    wintypes.LPARAM(lparam)
-                )
+                for i, b in enumerate(buttons):
+                    b64_b = encode_text(b)
+                    btn_scripts.append(f"""
+                    $b_t = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("{b64_b}"))
+                    $btn{i} = New-Object Windows.Forms.Button
+                    $btn{i}.Text = $b_t
+                    $btn{i}.Location = New-Object Drawing.Point({start_x + i*(btn_w+spacing)}, 145)
+                    $btn{i}.Size = New-Object Drawing.Size({btn_w}, {btn_h})
+                    $btn{i}.FlatStyle = 'Flat'
+                    $btn{i}.BackColor = [System.Drawing.Color]::FromArgb({btn_bg})
+                    $btn{i}.ForeColor = [System.Drawing.Color]::FromArgb({btn_text})
+                    $btn{i}.Font = New-Object Drawing.Font("Segoe UI", 10)
+                    $btn{i}.Cursor = [System.Windows.Forms.Cursors]::Hand
+                    $btn{i}.Padding = New-Object Windows.Forms.Padding(0)
 
-            class WNDCLASSW(ctypes.Structure):
-                _fields_ = [
-                    ("style", wintypes.UINT),
-                    ("lpfnWndProc", WNDPROC),
-                    ("cbClsExtra", ctypes.c_int),
-                    ("cbWndExtra", ctypes.c_int),
-                    ("hInstance", wintypes.HINSTANCE),
-                    ("hIcon", wintypes.HICON),
-                    ("hCursor", wintypes.HICON),
-                    ("hbrBackground", wintypes.HBRUSH),
-                    ("lpszMenuName", wintypes.LPCWSTR),
-                    ("lpszClassName", wintypes.LPCWSTR),
-                ]
+                    # Hover effect
+                    $btn{i}.Add_MouseEnter({{ $this.BackColor = [System.Drawing.Color]::FromArgb({btn_hover}) }})
+                    $btn{i}.Add_MouseLeave({{ $this.BackColor = [System.Drawing.Color]::FromArgb({btn_bg}) }})
 
-            # Register Class
-            wc = WNDCLASSW()
-            wc.hInstance = hInstance
-            wc.lpszClassName = wndClassName
-            wc.lpfnWndProc = WNDPROC(DefWindowProc)
-            wc.style = 0
-            ctypes.windll.user32.RegisterClassW(ctypes.byref(wc))
+                    $btn{i}.Add_Click({{ $global:result = $this.Text; $form.Close() }})
+                    $form.Controls.Add($btn{i})""")
 
-            # Create Window
-            hWnd = ctypes.windll.user32.CreateWindowExW(
-                0, wndClassName, "HiddenToastWindow", 0,
-                0, 0, 0, 0,
-                None, None, hInstance, None
-            )
+                pos_x_code = f"($right - {win_w} - 20)" if x == -1 else str(x)
+                pos_y_code = f"($bottom - {win_h + 20})" if y == -1 else str(y)
 
-            # Prepare struct
-            nid = NOTIFYICONDATAW()
-            nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
-            nid.hWnd = hWnd
-            nid.uID = 1
-            nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO
-            nid.uCallbackMessage = WM_USER + 1
-            nid.hIcon = hIcon
-            # Strings are automatically assigned to WCHAR arrays
-            nid.szTip = app_name
-            nid.dwState = 0
-            nid.dwStateMask = 0
-            nid.szInfo = message
-            nid.uVersion = 0
-            nid.szInfoTitle = title
-            nid.dwInfoFlags = NIIF_INFO
-            nid.hBalloonIcon = None
+                ps_script = f"""
+                [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+                Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
-            # Send notification
-            ret = ctypes.windll.shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+                $form = New-Object Windows.Forms.Form
+                $form.Size = New-Object Drawing.Size({win_w}, {win_h})
+                $form.FormBorderStyle = 'None'
+                $form.StartPosition = 'Manual'
+                $form.TopMost = $true
+                $form.BackColor = [System.Drawing.Color]::FromArgb({bg})
 
-            # Clean up
-            time.sleep(duration)
-            ctypes.windll.shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
-            ctypes.windll.user32.DestroyWindow(hWnd)
+                # Apply rounded corners using DWM
+                $form.Add_Load({{
+                    try {{
+                        # Import DWM APIs for rounded corners
+                        $dwm = Add-Type -MemberDefinition '[DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize); [DllImport("dwmapi.dll")] public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins); public struct MARGINS {{ public int Left; public int Right; public int Top; public int Bottom; }}' -Name "Dwm" -Namespace Win32Functions -PassThru
 
-            if ret:
-                return f"Notification sent: {title} (from {app_name})"
-            else:
-                return "Error: Shell_NotifyIconW returned FALSE."
+                        # Round corners (Windows 11 style)
+                        $pref = 2  # DWMWCP_ROUND
+                        $dwm::DwmSetWindowAttribute($form.Handle, 33, [ref]$pref, 4)
 
-        except Exception as e:
-            import traceback
-            return f"Error sending notification: {str(e)}\n{traceback.format_exc()}"
+                        # Extend glass frame
+                        $margins = New-Object Win32Functions.Dwm+MARGINS
+                        $margins.Left = -1
+                        $margins.Right = -1
+                        $margins.Top = -1
+                        $margins.Bottom = -1
+                        $dwm::DwmExtendFrameIntoClientArea($form.Handle, [ref]$margins)
+                    }} catch {{}}
+                }})
+
+                # Custom paint for content
+                $form.Add_Paint({{
+                    $g = $_.Graphics
+                    $g.TextRenderingHint = 'ClearTypeGridFit'
+
+                    # Draw border
+                    $pen = New-Object Drawing.Pen([System.Drawing.Color]::FromArgb({border}), 1)
+                    $g.DrawRectangle($pen, 0, 0, {win_w}-1, {win_h}-1)
+
+                    # Draw title
+                    $titleFont = New-Object Drawing.Font("Segoe UI Semibold", 13)
+                    $titleBrush = New-Object Drawing.SolidBrush([System.Drawing.Color]::FromArgb({text_primary}))
+                    $g.DrawString([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("{b64_title}")), $titleFont, $titleBrush, 24, 24)
+
+                    # Draw message with word wrap
+                    $msgFont = New-Object Drawing.Font("Segoe UI", 10)
+                    $msgBrush = New-Object Drawing.SolidBrush([System.Drawing.Color]::FromArgb({text_secondary}))
+                    $msgRect = New-Object Drawing.RectangleF(24, 58, {win_w-48}, 75)
+                    $msgFormat = New-Object Drawing.StringFormat
+                    $msgFormat.Alignment = 'Near'
+                    $msgFormat.LineAlignment = 'Near'
+                    $g.DrawString([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("{b64_msg}")), $msgFont, $msgBrush, $msgRect, $msgFormat)
+                }})
+
+                # Position and show
+                $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+                $right = [int]$wa.Right
+                $bottom = [int]$wa.Bottom
+                $form.Location = New-Object Drawing.Point({pos_x_code}, {pos_y_code})
+
+                # Fade-in animation
+                $form.Opacity = 0
+                $fade = New-Object System.Windows.Forms.Timer
+                $fade.Interval = 20
+                $fade.Add_Tick({{
+                    if ($form.Opacity -lt 1) {{ $form.Opacity += 0.15 }} else {{ $fade.Stop() }}
+                }})
+                $fade.Start()
+
+                # Add buttons
+                {"".join(btn_scripts)}
+
+                # Auto-close timer
+                $t = New-Object System.Windows.Forms.Timer
+                $t.Interval = {duration*1000}
+                $t.Add_Tick({{ $form.Close() }})
+                $t.Start()
+
+                $form.ShowDialog() | Out-Null
+                $global:result
+                """
+
+                out = subprocess.check_output(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script], encoding='utf-8').strip()
+                return f"User selected: {out}" if out else "timeout"
+            except Exception as e: return f"Error in choice mode: {str(e)}"
+
+        if style == "modern":
+            try:
+                hicon = win32gui.LoadIcon(0, win32con.IDI_APPLICATION)
+                nid = (win32gui.GetForegroundWindow(), 0, win32gui.NIF_ICON | win32gui.NIF_MESSAGE | win32gui.NIF_TIP | win32gui.NIF_INFO,
+                       win32con.WM_USER + 20, hicon, app_name, message, 10, title, win32gui.NIIF_INFO)
+                win32gui.Shell_NotifyIcon(win32gui.NIM_ADD, nid)
+                def cleanup():
+                    time.sleep(10)
+                    win32gui.Shell_NotifyIcon(win32gui.NIM_DELETE, nid)
+                import threading
+                threading.Thread(target=cleanup, daemon=True).start()
+                return f"Modern notification '{title}' sent."
+            except Exception as e: return f"Error in modern mode: {str(e)}"
+
+        return f"Notification '{title}' sent."
 
     @mcp.tool(name="MyPC-open_app")
     def open_app(app_name: str, arguments: str = "") -> str:
