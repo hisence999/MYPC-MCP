@@ -3,132 +3,331 @@
 
     "server": {
         "_comment": "服务器配置",
-        "enabled": true,
-        "name": "MyPC-MCP",
-        "port": 9999,
-        "host": "0.0.0.0",
-        "domain": "localhost",
 
-        "_network": "网络访问配置说明",
-        "_host_explanation": "host: 监听地址。0.0.0.0 = 监听所有网络接口（局域网+公网），127.0.0.1 = 仅本机",
-        "_domain_explanation": "domain: 访问域名。localhost = 本机访问，IP地址 = 局域网访问，你的域名 = 公网访问",
+        "enabled": {
+            "_desc": "是否启用 MCP 服务器",
+            "_type": "boolean",
+            "_default": "true"
+        },
 
-        "_lan_example": "局域网访问示例:",
-        "_lan_host": "  host: 0.0.0.0",
-        "_lan_domain": "  domain: 你的局域网IP (如 192.168.1.100)",
+        "name": {
+            "_desc": "服务器名称，用于标识此 MCP 服务",
+            "_type": "string",
+            "_example": "\"MyPC-MCP\""
+        },
 
-        "_wan_example": "公网访问示例:",
-        "_wan_host": "  host: 0.0.0.0",
-        "_wan_domain": "  domain: 你的公网域名或IP",
-        "_wan_firewall": "  需要在路由器设置端口转发: 外部端口9999 -> 本机IP:9999",
-        "_wan_firewall_cmd": "  Windows防火墙需添加入站规则允许端口9999",
+        "port": {
+            "_desc": "服务器监听端口",
+            "_type": "number",
+            "_range": "1-65535",
+            "_default": "9999"
+        },
 
-        "screenshots_dir": "./screenshots",
-        "local_host_header": "localhost:9999"
+        "host": {
+            "_desc": "监听地址。0.0.0.0=所有接口(可局域网/公网访问), 127.0.0.1=仅本机",
+            "_type": "string",
+            "_options": ["0.0.0.0", "127.0.0.1"]
+        },
+
+        "domain": {
+            "_desc": "访问域名或IP。localhost=本机, 局域网IP=局域网访问, 域名=公网访问",
+            "_type": "string",
+            "_note": "公网访问需在路由器配置端口转发"
+        },
+
+        "screenshots_dir": {
+            "_desc": "屏幕截图保存目录，相对路径或绝对路径",
+            "_type": "string",
+            "_default": "\"./screenshots\""
+        },
+
+        "local_host_header": {
+            "_desc": "本地请求的 Host 头，用于内部访问",
+            "_type": "string",
+            "_default": "\"localhost:9999\""
+        }
     },
 
-    "safe_zones": [
-        "%USERPROFILE%\\Documents",
-        "%USERPROFILE%\\Downloads",
-        "%USERPROFILE%\\Desktop",
-        "%USERPROFILE%\\Pictures",
-        "D:\\",
-        "E:\\"
-    ],
+    "safe_zones": {
+        "_desc": "安全区列表，允许写入操作的目录。工作区(workspace)优先级高于安全区",
+        "_type": "array<string>",
+        "_env_support": "支持环境变量如 %USERPROFILE%",
+        "_note": "读取操作不受限制，写入/删除/移动操作仅限安全区和工作区"
+    },
 
     "paths": {
-        "_comment": "工作区和其他路径配置",
-        "workspace": "%USERPROFILE%\\Workspace",
-        "everything": [
-            "C:\\Program Files\\Everything\\es.exe",
-            "C:\\Program Files (x86)\\Everything\\es.exe",
-            "D:\\APP\\Everything\\es.exe",
-            "es.exe"
-        ],
-        "git_bash": [
-            "C:\\Program Files\\Git\\bin\\bash.exe",
-            "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
-            "D:\\Program Files\\Git\\bin\\bash.exe",
-            "E:\\Program Files\\Git\\bin\\bash.exe"
-        ],
-        "download_dirs": [
-            "D:\\DOWNLOAD",
-            "D:\\Download"
-        ],
-        "drives": ["C:", "D:", "E:", "F:"]
+        "_comment": "路径配置",
+
+        "workspace": {
+            "_desc": "默认工作区目录，文件操作的基础路径。优先级高于安全区，工作区内所有操作都允许",
+            "_type": "string",
+            "_env_support": "支持环境变量如 %USERPROFILE%"
+        },
+
+        "everything": {
+            "_desc": "Everything 搜索工具路径，支持多个候选路径",
+            "_type": "array<string>",
+            "_note": "按顺序尝试，找到第一个存在的路径"
+        },
+
+        "git_bash": {
+            "_desc": "Git Bash 路径，用于执行 shell 命令",
+            "_type": "array<string>",
+            "_note": "按顺序尝试，找到第一个存在的路径"
+        },
+
+        "download_dirs": {
+            "_desc": "下载目录列表，用于浏览器下载文件",
+            "_type": "array<string>"
+        },
+
+        "drives": {
+            "_desc": "可用驱动器列表，用于文件操作",
+            "_type": "array<string>",
+            "_example": "[\"C:\", \"D:\", \"E:\"]"
+        }
     },
 
     "vlm": {
-        "enabled": false,
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "api_key": "",
-        "model": "glm-4.6v",
-        "prompt": "请详细描述图片并重点描述文字信息。"
+        "_comment": "视觉大模型配置，用于截图识别",
+
+        "enabled": {
+            "_desc": "是否启用视觉大模型功能",
+            "_type": "boolean",
+            "_default": "false"
+        },
+
+        "base_url": {
+            "_desc": "视觉大模型 API 地址",
+            "_type": "string"
+        },
+
+        "api_key": {
+            "_desc": "API 密钥",
+            "_type": "string",
+            "_required": true
+        },
+
+        "model": {
+            "_desc": "使用的模型名称",
+            "_type": "string",
+            "_example": "\"glm-4v\""
+        },
+
+        "prompt": {
+            "_desc": "截图识别的提示词",
+            "_type": "string"
+        }
     },
 
     "screen": {
-        "max_screenshots": 20,
-        "llm_max_dim": 800,
-        "llm_quality": 60,
-        "vlm_max_dim": 1000,
-        "vlm_quality": 60,
-        "vlm_timeout": 60
+        "_comment": "屏幕截图配置",
+
+        "max_screenshots": {
+            "_desc": "最多保留的截图数量，超出后自动删除旧截图",
+            "_type": "number",
+            "_default": "20"
+        },
+
+        "llm_max_dim": {
+            "_desc": "发送给 LLM 的图片最大尺寸（长或宽）",
+            "_type": "number",
+            "_unit": "像素",
+            "_default": "800"
+        },
+
+        "llm_quality": {
+            "_desc": "发送给 LLM 的图片质量 (1-100)",
+            "_type": "number",
+            "_range": "1-100",
+            "_default": "60"
+        },
+
+        "vlm_max_dim": {
+            "_desc": "发送给 VLM 的图片最大尺寸（长或宽）",
+            "_type": "number",
+            "_unit": "像素",
+            "_default": "1000"
+        },
+
+        "vlm_quality": {
+            "_desc": "发送给 VLM 的图片质量 (1-100)",
+            "_type": "number",
+            "_range": "1-100",
+            "_default": "60"
+        },
+
+        "vlm_timeout": {
+            "_desc": "VLM API 请求超时时间",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "60"
+        }
     },
 
     "system": {
-        "cpu_interval": 0.1
+        "_comment": "系统监控配置",
+
+        "cpu_interval": {
+            "_desc": "CPU 使用率采样间隔时间",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "0.1"
+        }
     },
 
     "files": {
-        "default_workspace": "D:\\ALICE",
-        "default_read_lines": 300,
-        "grep_max_results": 100
+        "_comment": "文件操作配置",
+
+        "default_workspace": {
+            "_desc": "默认工作区路径，已废弃，请使用 paths.workspace",
+            "_type": "string",
+            "_deprecated": true
+        },
+
+        "default_read_lines": {
+            "_desc": "读取文本文件时的默认最大行数",
+            "_type": "number",
+            "_default": "300"
+        },
+
+        "grep_max_results": {
+            "_desc": "文本搜索返回的最大结果数",
+            "_type": "number",
+            "_default": "100"
+        }
     },
 
     "window": {
-        "notification_duration": 60,
-        "notification_app_name": "MyPC",
-        "process_list_limit": 20,
-        "window_list_limit": 50,
-        "delay_min_seconds": 1,
-        "delay_max_seconds": 120
+        "_comment": "窗口和通知配置",
+
+        "notification_duration": {
+            "_desc": "通知默认显示时长",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "60"
+        },
+
+        "notification_app_name": {
+            "_desc": "通知中显示的应用名称",
+            "_type": "string",
+            "_default": "\"MyPC\""
+        },
+
+        "process_list_limit": {
+            "_desc": "进程列表返回的最大数量",
+            "_type": "number",
+            "_default": "20"
+        },
+
+        "window_list_limit": {
+            "_desc": "窗口列表返回的最大数量",
+            "_type": "number",
+            "_default": "50"
+        },
+
+        "delay_min_seconds": {
+            "_desc": "自动点击/输入的最小延迟时间",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "1"
+        },
+
+        "delay_max_seconds": {
+            "_desc": "自动点击/输入的最大延迟时间",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "120"
+        }
     },
 
     "search": {
-        "default_limit": 20
+        "_comment": "文件搜索配置",
+
+        "default_limit": {
+            "_desc": "Everything 搜索默认返回的最大结果数",
+            "_type": "number",
+            "_default": "20"
+        }
     },
 
     "keyboard_mouse": {
-        "failsafe": true,
-        "pause": 0.1,
-        "type_interval": 0.02
+        "_comment": "键盘鼠标控制配置",
+
+        "failsafe": {
+            "_desc": "是否启用防误触功能，将鼠标移到屏幕角落可终止操作",
+            "_type": "boolean",
+            "_default": "true"
+        },
+
+        "pause": {
+            "_desc": "键盘/鼠标操作后的默认暂停时间",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "0.1"
+        },
+
+        "type_interval": {
+            "_desc": "打字时每个字符之间的间隔时间",
+            "_type": "number",
+            "_unit": "秒",
+            "_default": "0.02"
+        }
     },
 
     "detector": {
-        "search_depth": 3,
-        "common_dirs": [
-            "Desktop", "Downloads", "Documents", "Pictures",
-            "Videos", "Music", "Projects", "Source", "Repos",
-            "GitHub", "Work", "Workspace"
-        ]
+        "_comment": "文件检测配置",
+
+        "search_depth": {
+            "_desc": "文件搜索时的目录递归深度",
+            "_type": "number",
+            "_default": "3"
+        },
+
+        "common_dirs": {
+            "_desc": "常用目录名称列表，用于快速定位文件",
+            "_type": "array<string>",
+            "_example": "[\"Desktop\", \"Downloads\", \"Documents\", \"Projects\"]"
+        }
     },
 
     "ssh": {
+        "_comment": "SSH 远程命令配置",
+
         "hosts": {
-            "MyServer": {
-                "host": "192.168.1.100",
-                "port": 22,
-                "user": "your_username",
-                "password": "your_password",
-                "_comment": "Or use key_file instead of password"
+            "_desc": "SSH 主机配置，key 为主机别名",
+            "_type": "object",
+            "_fields": {
+                "host": {
+                    "_desc": "SSH 服务器地址",
+                    "_type": "string",
+                    "_required": true
+                },
+                "port": {
+                    "_desc": "SSH 端口",
+                    "_type": "number",
+                    "_default": "22"
+                },
+                "user": {
+                    "_desc": "SSH 用户名",
+                    "_type": "string",
+                    "_required": true
+                },
+                "password": {
+                    "_desc": "SSH 密码，与 key_file 二选一",
+                    "_type": "string"
+                },
+                "key_file": {
+                    "_desc": "SSH 私钥文件路径，与 password 二选一",
+                    "_type": "string"
+                }
             }
         },
-        "allowed_commands": [
-            "docker", "docker-compose",
-            "git", "npm", "node", "python", "pip",
-            "ping", "curl", "wget", "ss", "ip", "nslookup", "dig",
-            "grep", "awk", "sed", "sort", "uniq", "wc", "tail", "head", "less",
-            "vim", "nano", "cat", "journalctl"
-        ]
+
+        "allowed_commands": {
+            "_desc": "允许执行的命令列表（白名单模式）",
+            "_type": "array<string>",
+            "_note": "只有在此列表中的命令才能被执行"
+        }
     }
 }
