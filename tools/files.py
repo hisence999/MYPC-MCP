@@ -64,12 +64,22 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
     os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
 
     def is_in_safe_zone(path: str) -> bool:
-        """Check if path is within any safe zone."""
+        """Check if path is within workspace or any safe zone. Workspace takes priority."""
         try:
             abs_path = os.path.abspath(path)
             # Normalize path case for Windows
             norm_path = os.path.normcase(abs_path)
 
+            # Check workspace first (workspace is above safe zones)
+            norm_workspace = os.path.normcase(os.path.abspath(DEFAULT_WORKSPACE))
+            if norm_path == norm_workspace:
+                return True
+            if not norm_workspace.endswith(os.sep):
+                norm_workspace += os.sep
+            if norm_path.startswith(norm_workspace):
+                return True
+
+            # Then check safe zones
             for zone in allowed_zones:
                 abs_zone = os.path.abspath(zone)
                 norm_zone = os.path.normcase(abs_zone)
@@ -92,8 +102,10 @@ def register_file_tools(mcp: FastMCP, safe_zones: list[str] = None, base_url: st
             return False
 
     def get_safe_zones_str() -> str:
-        """Get formatted list of safe zones for error messages."""
-        return "\n".join(f"  - {z}" for z in allowed_zones)
+        """Get formatted list of workspace and safe zones for error messages."""
+        zones = [f"Workspace: {DEFAULT_WORKSPACE}"]
+        zones.extend(f"  - {z}" for z in allowed_zones)
+        return "\n".join(zones)
 
     # ==================== HELPERS FOR OFFICE FILES ====================
 
